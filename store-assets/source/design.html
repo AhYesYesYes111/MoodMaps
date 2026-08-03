@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MoodMaps Chrome Web Store Assets</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="canvas">
+      <section class="slide slide-1">
+        <div class="copy left-copy">
+          <div class="brandline">
+            <img src="../../extension/public/icons/icon128.png" alt="" />
+            <span>MoodMaps</span>
+          </div>
+          <h1>Choose the route<br />that feels better.</h1>
+          <p>Compare driving routes by calmness,<br />not only travel time.</p>
+          <div class="platform-row">
+            <span>Google Maps</span><span>Apple Maps</span><span>Waze</span><span>Amap</span>
+          </div>
+        </div>
+        <div class="real-shot-frame real-shot-hero">
+          <img src="../real-screenshots/google-maps-routes-content.png" alt="MoodMaps scores displayed on real Google Maps routes" />
+        </div>
+      </section>
+
+      <section class="slide slide-2">
+        <header class="center-copy">
+          <span class="kicker">CALMNESS AT A GLANCE</span>
+          <h1>Mood Scores, right on your map.</h1>
+          <p>See a clear score on every visible driving route.</p>
+        </header>
+        <div class="real-shot-frame real-shot-wide">
+          <img src="../real-screenshots/apple-maps-routes-content.png" alt="MoodMaps scores displayed on real Apple Maps routes" />
+        </div>
+      </section>
+
+      <section class="slide slide-3">
+        <div class="copy left-copy factors-copy">
+          <span class="kicker">CLEAR BY DESIGN</span>
+          <h1>See what shapes<br />every score.</h1>
+          <p>Visible proxies are labeled clearly;<br />segments and turn counts are never guessed.</p>
+          <div class="factor-pills">
+            <span>Traffic</span><span>Delay</span><span>Complexity</span><span>Duration</span><span>Weather</span>
+          </div>
+        </div>
+        <div class="real-shot-frame current-popup-full">
+          <img src="../ui/popup-results.png" alt="Current MoodMaps result showing available and excluded scoring inputs" />
+        </div>
+      </section>
+
+      <section class="slide slide-4">
+        <header class="center-copy">
+          <span class="kicker">YOUR ROUTE, YOUR PRIORITY</span>
+          <h1>Fastest. Balanced. Calmest.</h1>
+          <p>Understand the trade-off before you start driving.</p>
+        </header>
+        <div class="real-comparison">
+          <article>
+            <span>GOOGLE MAPS</span>
+            <div class="real-shot-frame">
+              <img src="../real-screenshots/google-maps-routes-content.png" alt="Real Google Maps route comparison with MoodMaps" />
+            </div>
+          </article>
+          <article>
+            <span>APPLE MAPS</span>
+            <div class="real-shot-frame">
+              <img src="../real-screenshots/apple-maps-routes-content.png" alt="Real Apple Maps route comparison with MoodMaps" />
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="slide slide-5">
+        <div class="copy left-copy weather-copy">
+          <span class="kicker">MORE CONTEXT, LESS GUESSWORK</span>
+          <h1>Current context,<br />without invented detail.</h1>
+          <p>MoodMaps uses visible traffic, pace, route names,<br />ETA, and weather - then explains every input.</p>
+          <div class="privacy-note">
+            <b>No second route form.</b>
+            <span>Just plan your drive in a supported map.</span>
+          </div>
+        </div>
+        <div class="real-shot-frame current-popup-detail">
+          <img src="../ui/popup-results.png" alt="Current MoodMaps result showing traffic, complexity, delay, duration, and weather context" />
+        </div>
+      </section>
+
+      <section class="slide slide-small">
+        <img class="small-real-bg" src="../real-screenshots/google-maps-routes-full.png" alt="" />
+        <div class="small-overlay"></div>
+        <div class="small-brand-card">
+          <img src="../../extension/public/icons/icon128.png" alt="" />
+          <div>
+            <h1>MoodMaps</h1>
+            <p>Route calmness, explained.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide slide-marquee">
+        <div class="marquee-copy">
+          <div class="brandline">
+            <img src="../../extension/public/icons/icon128.png" alt="" />
+            <span>MoodMaps</span>
+          </div>
+          <h1>A calmer way<br />to compare routes.</h1>
+          <p>Mood Scores for Google Maps, Apple Maps, Waze, and Amap.</p>
+        </div>
+        <div class="real-shot-frame marquee-real-shot">
+          <img src="../real-screenshots/apple-maps-score-explainer-full.png" alt="MoodMaps on a real Apple Maps route" />
+        </div>
+      </section>
+    </main>
+    <script>
+      const asset = new URLSearchParams(location.search).get("asset") || "1";
+      document.body.dataset.asset = asset;
+    </script>
+  </body>
+</html>

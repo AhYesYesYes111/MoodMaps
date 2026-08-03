@@ -1,0 +1,2 @@
+"""MoodMaps backend application."""
+

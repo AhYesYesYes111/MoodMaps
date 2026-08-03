@@ -1,0 +1,433 @@
+.moodmaps-route-badge-slot,
+.moodmaps-route-badge,
+.moodmaps-route-badge *,
+.moodmaps-score-explainer,
+.moodmaps-score-explainer * {
+  box-sizing: border-box !important;
+}
+
+.moodmaps-route-badge-slot {
+  all: initial;
+  display: block !important;
+  width: 100% !important;
+  height: 44px !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  margin: 6px 0 0 !important;
+  overflow: hidden !important;
+  contain: layout paint !important;
+  border-top: 1px solid #e2e2e2 !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+}
+
+.moodmaps-route-badge-slot--amap {
+  width: 132px !important;
+  height: 38px !important;
+  margin: 5px 0 -7px auto !important;
+  border-top: 0 !important;
+}
+
+.moodmaps-route-badge-slot--amap .moodmaps-route-badge {
+  height: 37px !important;
+}
+
+.moodmaps-route-badge-slot--amap .moodmaps-route-badge--score,
+.moodmaps-route-badge-slot--amap .moodmaps-route-badge--action {
+  padding: 3px 0 2px !important;
+}
+
+.moodmaps-route-badge {
+  all: initial;
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto !important;
+  width: 100% !important;
+  height: 43px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #222 !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  animation: moodmaps-content-in 160ms ease-out both !important;
+}
+
+.moodmaps-route-badge--score {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 3px 6px !important;
+  padding: 6px 0 3px !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  text-align: right !important;
+}
+
+.moodmaps-route-badge--score:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+.moodmaps-route-badge--score:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.3) !important;
+  outline-offset: 1px !important;
+}
+
+.moodmaps-route-badge__eyebrow {
+  display: inline !important;
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  color: #666 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.65px !important;
+  line-height: 1.1 !important;
+}
+
+.moodmaps-route-badge__score-row {
+  display: flex !important;
+  min-width: 0 !important;
+  align-items: baseline !important;
+  gap: 5px !important;
+  color: #222 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.moodmaps-route-badge__score-row strong {
+  color: #111 !important;
+  font-size: 17px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.5px !important;
+  line-height: 1 !important;
+}
+
+.moodmaps-route-badge__score-row span {
+  max-width: 90px !important;
+  overflow: hidden !important;
+  color: #555 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1.05 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.moodmaps-route-badge--action {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  padding: 6px 0 3px !important;
+  cursor: pointer !important;
+  text-align: right !important;
+}
+
+.moodmaps-route-badge--action:hover:not(:disabled) {
+  background: #f5f5f5 !important;
+  box-shadow: none !important;
+}
+
+.moodmaps-route-badge--action:focus-visible {
+  outline: 3px solid rgba(0, 0, 0, 0.25) !important;
+  outline-offset: 2px !important;
+}
+
+.moodmaps-route-badge--action:disabled {
+  cursor: wait !important;
+  opacity: 1 !important;
+}
+
+.moodmaps-route-badge--loading .moodmaps-route-badge__mark {
+  animation: moodmaps-loading-pulse 1.15s ease-in-out infinite !important;
+}
+
+.moodmaps-route-badge__mark {
+  display: grid !important;
+  width: 23px !important;
+  height: 23px !important;
+  flex: 0 0 auto !important;
+  place-items: center !important;
+  border-radius: 7px 7px 7px 3px !important;
+  background: #171717 !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+}
+
+.moodmaps-route-badge__action-copy {
+  display: grid !important;
+  min-width: 0 !important;
+  gap: 2px !important;
+}
+
+.moodmaps-route-badge__action-copy strong {
+  color: #222 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+
+.moodmaps-route-badge__action-copy small {
+  overflow: hidden !important;
+  color: #666 !important;
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  line-height: 1.05 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.moodmaps-score-explainer {
+  all: initial;
+  position: fixed !important;
+  z-index: 2147483646 !important;
+  display: block !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: calc(100vh - 24px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  border: 1px solid #d7d7d7 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18) !important;
+  color: #222 !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  animation: moodmaps-explainer-in 140ms ease-out both !important;
+}
+
+.moodmaps-score-explainer:focus {
+  outline: none !important;
+}
+
+.moodmaps-score-explainer__header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 16px 16px 12px !important;
+  border: 0 !important;
+  background: #ffffff !important;
+}
+
+.moodmaps-score-explainer__header > div {
+  display: grid !important;
+  min-width: 0 !important;
+  gap: 3px !important;
+}
+
+.moodmaps-score-explainer__eyebrow {
+  color: #666 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.85px !important;
+  line-height: 1.2 !important;
+}
+
+.moodmaps-score-explainer__header strong {
+  display: block !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  color: #222 !important;
+  font-size: 15px !important;
+  font-weight: 760 !important;
+  letter-spacing: -0.2px !important;
+  line-height: 1.25 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.moodmaps-score-explainer__header small {
+  display: block !important;
+  overflow: hidden !important;
+  color: #666 !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.moodmaps-score-explainer__close {
+  all: initial;
+  display: grid !important;
+  width: 27px !important;
+  height: 27px !important;
+  flex: 0 0 auto !important;
+  place-items: center !important;
+  border-radius: 50% !important;
+  background: #f2f2f2 !important;
+  color: #666 !important;
+  cursor: pointer !important;
+  font-family: Arial, sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+}
+
+.moodmaps-score-explainer__close:hover {
+  background: #e8e8e8 !important;
+}
+
+.moodmaps-score-explainer__close:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.3) !important;
+  outline-offset: 2px !important;
+}
+
+.moodmaps-score-explainer__summary {
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  align-items: center !important;
+  gap: 14px !important;
+  margin: 0 16px !important;
+  padding: 12px 0 !important;
+  border-top: 1px solid #e6e6e6 !important;
+  border-bottom: 1px solid #e6e6e6 !important;
+}
+
+.moodmaps-score-explainer__result {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+
+.moodmaps-score-explainer__result strong {
+  color: #111 !important;
+  font-size: 27px !important;
+  font-weight: 800 !important;
+  letter-spacing: -1px !important;
+  line-height: 1 !important;
+}
+
+.moodmaps-score-explainer__result span {
+  color: #666 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+
+.moodmaps-score-explainer__formula {
+  display: grid !important;
+  gap: 3px !important;
+}
+
+.moodmaps-score-explainer__formula p {
+  margin: 0 !important;
+  color: #666 !important;
+  font-size: 10px !important;
+  font-weight: 550 !important;
+  line-height: 1.35 !important;
+}
+
+.moodmaps-score-explainer__components {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  margin: 0 !important;
+  padding: 17px 16px !important;
+}
+
+.moodmaps-score-explainer__component {
+  display: grid !important;
+  min-width: 0 !important;
+  gap: 5px !important;
+  padding: 0 9px !important;
+  border-left: 1px solid #e6e6e6 !important;
+  text-align: left !important;
+}
+
+.moodmaps-score-explainer__component:first-child {
+  padding-left: 0 !important;
+  border-left: 0 !important;
+}
+
+.moodmaps-score-explainer__component:last-child {
+  padding-right: 0 !important;
+}
+
+.moodmaps-score-explainer__component strong,
+.moodmaps-score-explainer__component span,
+.moodmaps-score-explainer__component small {
+  display: block !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.moodmaps-score-explainer__component strong {
+  color: #555 !important;
+  font-size: 10px !important;
+  font-weight: 750 !important;
+  line-height: 1.2 !important;
+}
+
+.moodmaps-score-explainer__component span {
+  color: #222 !important;
+  font-size: 10px !important;
+  font-weight: 650 !important;
+  line-height: 1.2 !important;
+}
+
+.moodmaps-score-explainer__component small {
+  color: #666 !important;
+  font-size: 10px !important;
+  font-weight: 550 !important;
+  line-height: 1.2 !important;
+}
+
+@keyframes moodmaps-content-in {
+  from {
+    opacity: 0.62;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes moodmaps-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.64;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes moodmaps-explainer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moodmaps-route-badge {
+    animation: none !important;
+  }
+
+  .moodmaps-route-badge--loading .moodmaps-route-badge__mark {
+    animation: none !important;
+  }
+
+  .moodmaps-score-explainer {
+    animation: none !important;
+  }
+}

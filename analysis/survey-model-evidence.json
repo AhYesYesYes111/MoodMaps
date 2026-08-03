@@ -1,0 +1,42 @@
+{
+  "sample_size": 209,
+  "field_period": [
+    "2026-07-01",
+    "2026-07-02"
+  ],
+  "source": {
+    "样本服务": 209
+  },
+  "weather_mood_worsened_share": 0.722488038277512,
+  "top_three_share": {
+    "拥堵": 0.7320574162679426,
+    "天气": 0.6028708133971292,
+    "乘客态度": 0.37799043062200954,
+    "目的地偏远": 0.37320574162679426,
+    "红绿灯": 0.3397129186602871,
+    "转弯/复杂": 0.13875598086124402,
+    "周末/节假日": 0.21052631578947367,
+    "距离长": 0.0861244019138756
+  },
+  "proposed_weights": {
+    "交通强度": 0.32,
+    "额外延误": 0.2,
+    "路线复杂度": 0.2,
+    "持续时长": 0.12,
+    "天气风险": 0.16
+  },
+  "quality": {
+    "numeric_rows": 209,
+    "text_rows": 209,
+    "numeric_unique_ids": 209,
+    "text_unique_ids": 209,
+    "paired_ids": 209,
+    "numeric_only_ids": 0,
+    "text_only_ids": 0,
+    "closed_question_missing_cells": 0,
+    "response_seconds_median": 75.0,
+    "response_under_90_share": 0.6028708133971292,
+    "q3_straight_lined": 2,
+    "top_three_fewer_than_three": 22
+  }
+}

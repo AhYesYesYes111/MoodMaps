@@ -1,0 +1,384 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "MoodMaps Mood Score V2",
+    "description": "A survey-backed decision report for the MoodMaps scoring model and no-key Open-Meteo integration.",
+    "generatedAt": "2026-07-25T02:59:33Z",
+    "cards": [],
+    "charts": [
+      {
+        "id": "factor_priority_chart",
+        "title": "最在意因素的选择率",
+        "subtitle": "n=209；受访者最多可选三个因素，22 人少选了至少一项",
+        "type": "horizontalBar",
+        "intent": "comparison",
+        "question": "哪些因素最常进入受访者最在意的前三项？",
+        "rationale": "长中文标签适合横向排序，单一百分比便于直接比较。",
+        "dataset": "factor_summary",
+        "sourceId": "survey_evidence",
+        "valueFormat": "percent",
+        "encodings": {
+          "x": {
+            "field": "factor",
+            "type": "nominal",
+            "label": "因素"
+          },
+          "y": {
+            "field": "top_three_share",
+            "type": "quantitative",
+            "label": "进入前三占比",
+            "format": "percent"
+          },
+          "tooltip": [
+            {
+              "field": "mean_impact",
+              "type": "quantitative",
+              "label": "平均影响（1-5）",
+              "format": "number"
+            },
+            {
+              "field": "high_impact_share",
+              "type": "quantitative",
+              "label": "高影响占比",
+              "format": "percent"
+            },
+            {
+              "field": "rank",
+              "type": "quantitative",
+              "label": "问卷证据排名",
+              "format": "number"
+            }
+          ]
+        },
+        "palette": {
+          "kind": "sequential",
+          "name": "blue"
+        },
+        "settings": {
+          "orientation": "horizontal",
+          "sort": "descending",
+          "showValues": true
+        },
+        "surface": {
+          "surface": "card",
+          "viewMode": "both"
+        },
+        "layout": "full"
+      },
+      {
+        "id": "model_weights_chart",
+        "title": "Mood Score V2 模型权重",
+        "subtitle": "基础模型权重；任何缺失项都会被移除并对其余项重归一化",
+        "type": "horizontalBar",
+        "intent": "comparison",
+        "question": "问卷证据收缩后，各可观测因素应占多少权重？",
+        "rationale": "权重是同一单位的类别比较，横向条形图最直接。",
+        "dataset": "model_weights",
+        "sourceId": "model_weights",
+        "valueFormat": "percent",
+        "encodings": {
+          "x": {
+            "field": "component",
+            "type": "nominal",
+            "label": "模型项"
+          },
+          "y": {
+            "field": "weight",
+            "type": "quantitative",
+            "label": "权重",
+            "format": "percent"
+          },
+          "tooltip": [
+            {
+              "field": "fallback_weight",
+              "type": "quantitative",
+              "label": "仅天气缺失时有效权重",
+              "format": "percent"
+            },
+            {
+              "field": "observable",
+              "type": "text",
+              "label": "主要数据"
+            }
+          ]
+        },
+        "palette": {
+          "kind": "sequential",
+          "name": "orange"
+        },
+        "settings": {
+          "orientation": "horizontal",
+          "sort": "descending",
+          "showValues": true
+        },
+        "surface": {
+          "surface": "card",
+          "viewMode": "both"
+        },
+        "layout": "full"
+      }
+    ],
+    "tables": [
+      {
+        "id": "factor_evidence_table",
+        "title": "因素问卷证据明细",
+        "subtitle": "影响均值、高影响占比、前三选择率与保守排序依据",
+        "dataset": "factor_summary",
+        "sourceId": "survey_evidence",
+        "defaultSort": {
+          "field": "evidence_index",
+          "direction": "desc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "rank",
+            "label": "排名",
+            "format": "number"
+          },
+          {
+            "field": "factor",
+            "label": "因素",
+            "type": "text"
+          },
+          {
+            "field": "mean_impact",
+            "label": "平均影响（1-5）",
+            "format": "number"
+          },
+          {
+            "field": "high_impact_share",
+            "label": "高影响占比",
+            "format": "percent"
+          },
+          {
+            "field": "top_three_share",
+            "label": "进入前三占比",
+            "format": "percent"
+          },
+          {
+            "field": "evidence_index",
+            "label": "问卷证据指数",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "weight_detail_table",
+        "title": "V2 权重和回退规则",
+        "subtitle": "缺失因素不当成低压力，而是退出模型并对可用因素重归一化",
+        "dataset": "model_weights",
+        "sourceId": "model_weights",
+        "defaultSort": {
+          "field": "weight",
+          "direction": "desc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "component",
+            "label": "模型项",
+            "type": "text"
+          },
+          {
+            "field": "weight",
+            "label": "基础权重",
+            "format": "percent"
+          },
+          {
+            "field": "fallback_weight",
+            "label": "仅天气缺失时有效权重",
+            "format": "percent"
+          },
+          {
+            "field": "observable",
+            "label": "主要数据",
+            "type": "text"
+          },
+          {
+            "field": "reason",
+            "label": "调整理由",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "survey_evidence",
+        "label": "209 份路线条件调查（数字版与文本版配对）",
+        "path": "analysis/report/factor_summary.sql",
+        "query": {
+          "sql": "SELECT rank, factor, mean_impact, ci_low, ci_high, high_impact_share, top_three_share, evidence_index, sample_size FROM factor_summary ORDER BY evidence_index DESC;",
+          "engine": "SQLite",
+          "language": "Python",
+          "description": "按回答序号配对两种 Excel 编码，计算量表均值、5,000 次自助法均值区间、4-5 分占比与前三选择率。",
+          "filters": [
+            "一行一位受访者",
+            "两份文件不重复计数",
+            "高影响定义为量表 4 或 5",
+            "问卷期为 2026 年 7 月 1 日至 2 日"
+          ],
+          "metric_definitions": [
+            "进入前三占比 = 在多选题中选择该因素的人数 / 209",
+            "高影响占比 = 影响评分为 4 或 5 的人数 / 209",
+            "问卷证据指数 = ((平均影响 - 1) / 4 + 进入前三占比) / 2"
+          ],
+          "tables_used": [
+            "370991459_按序号_路线条件对司机与骑手接单意愿和心情影响的调查_209_209.xlsx:Sheet1",
+            "370991459_按文本_路线条件对司机与骑手接单意愿和心情影响的调查_209_209.xlsx:Sheet1"
+          ]
+        }
+      },
+      {
+        "id": "model_weights",
+        "label": "Mood Score V2 权重建议与实现",
+        "path": "analysis/report/model_weights.sql",
+        "query": {
+          "sql": "SELECT component, weight, fallback_weight, observable, reason FROM model_weights ORDER BY weight DESC;",
+          "engine": "SQLite",
+          "language": "TypeScript",
+          "description": "根据问卷排序、数据可观测性和样本外有效性风险进行保守收缩，并在评分代码中实现动态重归一化。",
+          "metric_definitions": [
+            "Route Stress = 可用组件的加权和 / 可用权重之和",
+            "Route Calmness = 100 - Route Stress"
+          ]
+        }
+      },
+      {
+        "id": "implementation",
+        "label": "MoodMaps V2 评分实现",
+        "path": "extension/src/scoring/scoring.ts"
+      },
+      {
+        "id": "open_meteo_implementation",
+        "label": "MoodMaps Open-Meteo current-weather implementation",
+        "path": "extension/src/background/open-meteo.ts"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# MoodMaps Mood Score V2"
+      },
+      {
+        "id": "executive_summary_survey",
+        "type": "markdown",
+        "sourceId": "survey_evidence",
+        "body": "## Executive Summary\n\n- **天气值得进入模型。** 73.2% 把拥堵列入最在意前三，60.3% 选择天气差；72.2% 表示雨、雾或暴雨会让心情明显或稍微变差。\n- **距离不应继续被强惩罚。** 只有 8.6% 把距离长列入前三，而且长距离态度分裂为 46.9% 更好、41.1% 更差、12.0% 无所谓。\n- **这份问卷适合做先验，不适合直接训练。** 两份 Excel 是同一批 209 份回答；全部来自一个样本服务，60.3% 在 90 秒内完成，因此权重要保守收缩。"
+      },
+      {
+        "id": "executive_summary_model",
+        "type": "markdown",
+        "sourceId": "model_weights",
+        "body": "**建议已落地为 V2：**交通强度 32%、额外延误 20%、路线复杂度 20%、持续时长 12%、天气风险 16%。可靠路段或 maneuver 明细可用时优先使用；否则本地扩展只用页面可见的拥堵、ETA、路线相对速度和路线名称结构生成明确披露的代理值，不虚构路段、maneuver 或转弯次数。信号仍不足的因素退出模型并重归一化，不会把缺失误当成良好条件。"
+      },
+      {
+        "id": "survey_heading",
+        "type": "markdown",
+        "sourceId": "survey_evidence",
+        "body": "## 拥堵和天气是最稳定的可观测信号\n\n量表均值与‘最在意前三’不是同一个问题：前者反映普遍影响，后者反映优先级。拥堵在两种问法上都强；天气的平均影响最高，并在优先级中排第二。"
+      },
+      {
+        "id": "factor_chart_block",
+        "type": "chart",
+        "chartId": "factor_priority_chart",
+        "layout": "full"
+      },
+      {
+        "id": "survey_interpretation",
+        "type": "markdown",
+        "sourceId": "survey_evidence",
+        "body": "红绿灯多和转弯复杂常被评为‘有影响’，但进入前三的比例分别只有 34.0% 和 13.9%。这支持把它们合并为一个中等权重的路线复杂度项，避免对同一段复杂道路重复扣分。"
+      },
+      {
+        "id": "factor_table_block",
+        "type": "table",
+        "tableId": "factor_evidence_table",
+        "layout": "full"
+      },
+      {
+        "id": "model_heading",
+        "type": "markdown",
+        "sourceId": "model_weights",
+        "body": "## 模型从‘路线越久越差’转向‘可观测风险组合’\n\n天气信号被加入但限制在 16 分上限；持续时长从原来的 15% 降至 12%。交通仍然是核心，但交通强度和额外延误被分开，分别表示路段拥堵程度和相对无交通时长的不可预期损失。"
+      },
+      {
+        "id": "weights_chart_block",
+        "type": "chart",
+        "chartId": "model_weights_chart",
+        "layout": "full"
+      },
+      {
+        "id": "fallback_explanation",
+        "type": "markdown",
+        "sourceId": "implementation",
+        "body": "动态重归一化是这次最重要的工程保护：天气不可用，或 Traffic、Complexity 连可见代理信号也不足时，该项不计 0 分，而是退出分母。因此数据缺失或可选天气查询失败不会制造虚假的高分。"
+      },
+      {
+        "id": "weight_table_block",
+        "type": "table",
+        "tableId": "weight_detail_table",
+        "layout": "full"
+      },
+      {
+        "id": "weather_heading",
+        "type": "markdown",
+        "sourceId": "open_meteo_implementation",
+        "body": "## 天气接入保持无密钥和最小披露\n\n扩展直接查询 Open-Meteo 当前天气，不需要 Google API 或付费映射密钥。它优先使用地图已提供的端点坐标，只查询两个端点的地理中点；这不代表路线实际经过该点。没有坐标时，只允许明确的城市或地区级文本进入地理编码，完整地址和兴趣点名称会被拒绝。"
+      },
+      {
+        "id": "weather_privacy_latency",
+        "type": "markdown",
+        "sourceId": "open_meteo_implementation",
+        "body": "天气与可选粗粒度地理编码共享一个 4.5 秒总期限。结果使用不含原始地址的坐标或粗地区 cache key，在 Chrome session storage 中最多缓存 15 分钟；过期条目会被删除，存储或网络失败时继续计算路线分数。"
+      },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "body": "## 推荐下一步\n\n1. 在四个受支持地图上完成真实路线回归测试，重点验证可见 ETA、without-traffic time、文字警告、时间与距离组合及路线名称。\n2. 记录用户对实际路线的‘预测分 vs. 真实感受’，分别校准 Traffic 相对速度代理和 Complexity 路线名称代理。\n3. 如果后续加入工作类型，只对天气权重做小幅个性化：骑手暴露更高，车内驾驶者更低。\n4. 暂时不要给周末/节假日、乘客态度或目的地偏远强行计分；它们要么方向受收入影响，要么没有低成本、可靠的页面可见字段。"
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## 进一步需要回答的问题\n\n- 同一条路线在不同天气下，用户真实 Mood Score 会变化多少？\n- 当前 16% 天气上限对外卖骑手是否偏低、对出租车司机是否偏高？\n- 当前可重复的路线名称 Complexity 代理与用户感受到的实际操作复杂度相关性有多强？"
+      },
+      {
+        "id": "caveats",
+        "type": "markdown",
+        "sourceId": "survey_evidence",
+        "body": "## Caveats and assumptions\n\n问卷是横截面、自报、样本服务数据，不代表所有城市和职业，也不能证明因果。22 人没有按要求选满三个因素；两份导出虽完全配对，但它们不是独立复现。天气 V2 只使用当前条件；端点地理中点不是路线几何中点，也不覆盖远期路线的小时级预报。"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-25T02:59:33Z",
+    "status": "ready",
+    "datasets": {
+      "factor_summary": [
+        {"rank": 1, "factor": "拥堵", "mean_impact": 3.957, "ci_low": 3.828, "ci_high": 4.077, "high_impact_share": 0.7273, "top_three_share": 0.7321, "evidence_index": 0.7356, "sample_size": 209},
+        {"rank": 2, "factor": "天气", "mean_impact": 4.263, "ci_low": 4.134, "ci_high": 4.388, "high_impact_share": 0.8421, "top_three_share": 0.6029, "evidence_index": 0.7093, "sample_size": 209},
+        {"rank": 3, "factor": "乘客态度", "mean_impact": 3.971, "ci_low": 3.852, "ci_high": 4.096, "high_impact_share": 0.7225, "top_three_share": 0.3780, "evidence_index": 0.5604, "sample_size": 209},
+        {"rank": 4, "factor": "目的地偏远", "mean_impact": 3.847, "ci_low": 3.694, "ci_high": 3.995, "high_impact_share": 0.6986, "top_three_share": 0.3732, "evidence_index": 0.5425, "sample_size": 209},
+        {"rank": 5, "factor": "红绿灯", "mean_impact": 3.756, "ci_low": 3.617, "ci_high": 3.885, "high_impact_share": 0.6794, "top_three_share": 0.3397, "evidence_index": 0.5144, "sample_size": 209},
+        {"rank": 6, "factor": "转弯/复杂", "mean_impact": 3.761, "ci_low": 3.617, "ci_high": 3.895, "high_impact_share": 0.6842, "top_three_share": 0.1388, "evidence_index": 0.4145, "sample_size": 209},
+        {"rank": 7, "factor": "周末/节假日", "mean_impact": 3.124, "ci_low": 2.967, "ci_high": 3.282, "high_impact_share": 0.4115, "top_three_share": 0.2105, "evidence_index": 0.3708, "sample_size": 209},
+        {"rank": 8, "factor": "距离长", "mean_impact": 3.507, "ci_low": 3.368, "ci_high": 3.641, "high_impact_share": 0.5694, "top_three_share": 0.0861, "evidence_index": 0.3565, "sample_size": 209}
+      ],
+      "model_weights": [
+        {"component": "交通强度", "weight": 0.32, "fallback_weight": 0.3810, "observable": "可靠路段明细优先；否则用可见拥堵、ETA 或相对速度代理", "reason": "拥堵问卷证据最强"},
+        {"component": "额外延误", "weight": 0.20, "fallback_weight": 0.2381, "observable": "可见 ETA、无交通时间和路线相对差异", "reason": "反映不可预期时间损失"},
+        {"component": "路线复杂度", "weight": 0.20, "fallback_weight": 0.2381, "observable": "可靠 maneuver 优先；否则用路线名称结构代理", "reason": "合并红绿灯与转弯代理，避免重复计分"},
+        {"component": "持续时长", "weight": 0.12, "fallback_weight": 0.1429, "observable": "路线时长", "reason": "保留疲劳但降低绝对距离惩罚"},
+        {"component": "天气风险", "weight": 0.16, "fallback_weight": 0.0000, "observable": "降水、能见度、阵风、天气类型", "reason": "强信号，但对样本和群体差异做收缩"}
+      ]
+    },
+    "accessIssues": []
+  }
+}
