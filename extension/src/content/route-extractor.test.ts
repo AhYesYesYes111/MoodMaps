@@ -56,6 +56,61 @@ describe("Google Maps route extraction", () => {
     expect(result.destination?.text).toBe("Yale University");
   });
 
+  it("uses the last stop and its coordinates in a multi-stop route", () => {
+    const result = extractFromUrl(
+      "https://www.google.com/maps/dir/Boston/Providence/New+York/" +
+      "@41,-72,8z/data=!1d-71!2d42!1d-71.4!2d41.8!1d-74!2d40.7"
+    );
+    expect(result.origin).toEqual({ text: "Boston", latitude: 42, longitude: -71 });
+    expect(result.destination).toEqual({ text: "New York", latitude: 40.7, longitude: -74 });
+  });
+
+  it("keeps ambiguous waypoint coordinates off the endpoints", () => {
+    const result = extractFromUrl(
+      "https://www.google.com/maps/dir/Boston/Providence/New+York/data=!1d-71.4!2d41.8"
+    );
+    expect(result.origin).toEqual({ text: "Boston" });
+    expect(result.destination).toEqual({ text: "New York" });
+  });
+
+  it("does not substitute a waypoint for a missing destination", () => {
+    const result = extractFromUrl(
+      "https://www.google.com/maps/dir/Boston/Providence//@41,-72,8z/data=!4m2"
+    );
+    expect(result.origin?.text).toBe("Boston");
+    expect(result.destination).toBeNull();
+    expect(result.confidence).toBeLessThan(0.6);
+  });
+
+  it("extracts coordinates and plus codes from Maps URLs API directions", () => {
+    const result = extractRouteContext(
+      "https://www.google.com/maps/dir/?api=1&origin=42.36%2C-71.06" +
+      "&waypoints=Providence&destination=87G8Q2X7%2B4P+New+York&travelmode=driving",
+      document
+    );
+    expect(result.origin).toEqual({ text: "42.36,-71.06", latitude: 42.36, longitude: -71.06 });
+    expect(result.destination).toEqual({ text: "87G8Q2X7+4P New York" });
+    expect(result.travelMode).toBe("DRIVE");
+    expect(extractFromUrl("https://www.google.com/maps/dir/Boston/87G8Q2X7%2B4P+New+York/")
+      .destination).toEqual(result.destination);
+  });
+
+  it("honors a non-driving query mode even with a selected driving control", () => {
+    const doc = document.implementation.createHTMLDocument();
+    doc.body.innerHTML = '<button aria-pressed="true" aria-label="Driving"></button>';
+    const context = extractRouteContext(
+      "https://www.google.com/maps/dir/?api=1&destination=Boston&travelmode=walking",
+      doc
+    );
+    expect(context.origin).toBeNull();
+    expect(context.destination?.text).toBe("Boston");
+    expect(context.travelMode).toBe("UNKNOWN");
+    expect(detectTravelMode(
+      "https://www.google.com/maps/dir/A/B/data=!3e2?api=1&travelmode=driving",
+      doc
+    )).toBe("UNKNOWN");
+  });
+
   it("fails conservatively outside directions pages", () => {
     const result = extractFromUrl("https://www.google.com/maps/search/coffee");
     expect(result.origin).toBeNull();

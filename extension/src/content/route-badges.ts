@@ -163,9 +163,13 @@ export function parseWithoutTrafficMinutes(value: string): number | null {
 export function trafficSignalFromText(
   value: string
 ): "heavy" | "slow" | "light" | "unknown" {
+  // Baseline ETAs and avoided congestion describe conditions off this route.
+  // Remove only that phrase so a separate warning on the same card still counts.
   const text = normalizedText(value)
     .toLocaleLowerCase()
-    .replace(/\bcongestion charges?\b/g, "");
+    .replace(/\bcongestion charges?\b/g, " ")
+    .replace(/\b(?:avoid(?:s|ed|ing)?|no|without)\s+(?:(?:a|the|any)\s+)?(?:(?:heavy|severe|slow|light)\s+)?(?:traffic(?:\s+(?:jams?|congestion|slowdowns?))?|slowdowns?|congestion)\b/g, " ")
+    .replace(/(?:避开|避開|绕开|繞開|没有|沒有|无|無|不)(?:交通)?(?:严重|嚴重)?(?:拥堵|擁堵|堵车|堵車|缓慢|緩慢)/g, " ");
   if (/heavy traffic|traffic jam|severe traffic|congestion|严重拥堵|嚴重擁堵|堵车|堵車/.test(text)) {
     return "heavy";
   }
@@ -514,6 +518,7 @@ function findNativeActionRow(card: HTMLElement): HTMLElement | null {
     return NATIVE_ACTION_LABELS.has(text);
   });
   if (controls.length === 0) return null;
+  if (controls[0].parentElement === card) return controls[0];
 
   let row: HTMLElement | null = controls[0].parentElement;
   if (controls.length > 1) {

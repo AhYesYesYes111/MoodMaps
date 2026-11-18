@@ -143,6 +143,14 @@ describe("local route fallback", () => {
     );
   });
 
+  it("counts distinct named roads and recognizes cues across capitalization", () => {
+    expect(routeDescriptionComplexityStress("via Main St and Elm Rd")).toBe(38);
+    expect(routeDescriptionComplexityStress("via Main St and Main St")).toBe(18);
+    expect(routeDescriptionComplexityStress("via local streets")).toBe(18);
+    expect(routeDescriptionComplexityStress("via surface streets and I-95")).toBe(38);
+    expect(routeDescriptionComplexityStress("I-95 N Exit 8")).toBe(30);
+  });
+
   it("rejects invalid durations and normalizes other non-finite route inputs", () => {
     const response = createLocalFallbackResponse([
       {

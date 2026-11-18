@@ -296,11 +296,26 @@ describe("route-card badges", () => {
 
   it("reads visible traffic hints without inspecting map pixels", () => {
     expect(parseWithoutTrafficMinutes("2 hr 35 min without traffic")).toBe(155);
-    expect(trafficSignalFromText("Avoids slowdown on 12th Ave")).toBe("slow");
     expect(trafficSignalFromText("Heavy traffic ahead")).toBe("heavy");
     expect(trafficSignalFromText("Congestion charge")).toBe("unknown");
     expect(trafficSignalFromText("View traffic conditions")).toBe("unknown");
   });
+
+  it("ignores avoided or negated traffic while preserving other warnings", () => {
+    expect(trafficSignalFromText("Avoids slowdown on 12th Ave")).toBe("unknown");
+    expect(trafficSignalFromText("No heavy traffic")).toBe("unknown");
+    expect(trafficSignalFromText("Avoids a traffic jam. Slow traffic on Main St")).toBe("slow");
+    expect(trafficSignalFromText("避开严重拥堵，部分路段交通缓慢")).toBe("slow");
+    expect(trafficSignalFromText("無交通擁堵時30分鐘，目前嚴重擁堵")).toBe("heavy");
+  });
+
+  it.each(["不堵车需30分钟", "无交通拥堵时30分钟", "不堵車需30分鐘", "30 min without traffic"])(
+    "reads %s as a baseline ETA without adding a congestion label",
+    (text) => {
+      expect(parseWithoutTrafficMinutes(text)).toBe(30);
+      expect(trafficSignalFromText(text)).toBe("unknown");
+    }
+  );
 
   it("distributes displayed component percentages to an exact total", () => {
     const components: MoodScoreExplanation["components"] = [
@@ -658,6 +673,27 @@ describe("route-card badges", () => {
     });
     expect(card.querySelector(".moodmaps-route-badge--score")).toBe(score);
     expect(card.querySelectorAll(".moodmaps-route-badge-slot")).toHaveLength(1);
+  });
+
+  it("keeps the badge inside a card with direct Details and Preview buttons", () => {
+    const card = installRouteCardFixture();
+    for (const wrapper of card.querySelectorAll("#right-column, #native-actions")) {
+      wrapper.replaceWith(...wrapper.childNodes);
+    }
+    const details = card.querySelector("button");
+    const options = {
+      doc: document,
+      payload: livePayload,
+      state: "idle" as const,
+      onAnalyze: vi.fn()
+    };
+    renderRouteBadges(options);
+    const slot = card.querySelector(".moodmaps-route-badge-slot");
+    expect(slot?.nextElementSibling).toBe(details);
+    expect(slot?.querySelector(".moodmaps-route-badge--score")?.textContent)
+      .toContain("64");
+    renderRouteBadges(options);
+    expect(card.querySelector(".moodmaps-route-badge-slot")).toBe(slot);
   });
 
   it("keeps the same slot while switching through loading and results", () => {

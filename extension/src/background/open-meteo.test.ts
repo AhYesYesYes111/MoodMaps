@@ -92,6 +92,22 @@ describe("Open-Meteo weather normalization", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("rejects free-form district-like places in every geocoding position", async () => {
+    installSessionStorage();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    for (const name of ["阳光花园小区", "北京大学燕园校区", "故宮博物院景區", "华联超市"]) {
+      expect(coarseLocationText(name)).toBeNull();
+      expect(coarseLocationText("上海市, " + name)).toBeNull();
+      expect(coarseLocationText(name + ", 中国")).toBeNull();
+      expect(coarseLocationText(name + ", 上海市")).toBe("上海市");
+      await getEndpointMidpointWeather({ text: name }, { text: "北京市" });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(coarseLocationText("浦东新区")).toBe("浦东新区");
+    expect(coarseLocationText("香港特別行政區")).toBe("香港特別行政區");
+  });
+
   it("never forwards an unknown POI name from a two-part location", async () => {
     installSessionStorage();
     const fetchMock = vi.fn(async (input: string | URL | Request) => {

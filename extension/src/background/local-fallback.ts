@@ -80,33 +80,32 @@ export function routeDescriptionComplexityStress(
   if (!normalized) return null;
 
   const roads = new Set<string>();
+  const roadNames = normalized
+    .replace(/\b(?:local|surface) streets?\b|市区道路|市區道路|城市道路/gi, () => {
+      roads.add("local streets");
+      return ",";
+    })
+    .replace(/\b(?:via|and|then|onto)\b/gi, ",");
   addMatches(
     roads,
-    normalized,
+    roadNames,
     /\b(?:I|US|U\.S\.|SR|SH|CT|NY|MA|NJ|PA|CA|A|M|N)[- ]?\d{1,4}[A-Z]?\b/gi
   );
   addMatches(
     roads,
-    normalized,
+    roadNames,
     /\b(?:[A-Z0-9][A-Za-z0-9.'-]*\s+){0,4}(?:Street|Streets|St|Road|Rd|Avenue|Ave|Boulevard|Blvd|Lane|Ln|Drive|Dr|Highway|Hwy|Expressway|Freeway|Parkway|Turnpike|Bridge|Tunnel)\b/gi
   );
   addMatches(
     roads,
-    normalized,
+    roadNames,
     /[\u3400-\u9fff]{1,12}?(?:高速|快速路|大道|大街|公路|街|路|桥|橋|隧道|环线|環線)/g
   );
-  if (
-    /\b(?:local|surface) streets?\b|市区道路|市區道路|城市道路/i.test(
-      normalized
-    )
-  ) {
-    roads.add("local streets");
-  }
   if (roads.size === 0) return null;
 
   const decisionCues =
     normalized.match(
-      /\b(?:exit|merge|ramp|junction|interchange|roundabout)\b|出口|匝道|合流|互通|立交|环岛|環島/g
+      /\b(?:exit|merge|ramp|junction|interchange|roundabout)\b|出口|匝道|合流|互通|立交|环岛|環島/gi
     )?.length ?? 0;
   return clamp(18 + Math.max(0, roads.size - 1) * 20 + decisionCues * 12, 0, 100);
 }

@@ -25,10 +25,7 @@ const DESTINATION_LABELS = [
 ];
 
 function cleanLocation(value: string): string {
-  return value
-    .replace(/\+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function usableLocation(value: string): boolean {
@@ -51,34 +48,86 @@ function toLocation(
   return usableLocation(text) ? { text, ...coordinates } : null;
 }
 
+function googleDirectionsApiUrl(url: URL): boolean {
+  return (
+    url.searchParams.get("api") === "1" &&
+    /^\/(?:maps\/)?dir(?:\/|$)/.test(url.pathname)
+  );
+}
+
+function googleRouteData(url: URL): string {
+  return url.pathname.split("/").find((segment) => segment.startsWith("data=")) ??
+    url.searchParams.get("data") ?? "";
+}
+
+function googlePathStops(segments: string[]): string[] {
+  const stops: string[] = [];
+  for (const segment of segments) {
+    if (/^(?:@|data=|!3d)/.test(segment)) break;
+    const text = segment.replace(/\+/g, " ");
+    try {
+      stops.push(decodeURIComponent(text));
+    } catch {
+      stops.push(text);
+    }
+  }
+  return stops;
+}
+
+function googleCoordinates(latitude: number, longitude: number) {
+  if (Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+    return { latitude, longitude };
+  }
+  return undefined;
+}
+
+function googleLocation(
+  text: string | undefined,
+  coordinates?: { latitude: number; longitude: number }
+): LocationInput | null {
+  if (!text) return null;
+  const point = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/.exec(text);
+  return toLocation(
+    text,
+    point ? googleCoordinates(Number(point[1]), Number(point[2])) : coordinates
+  );
+}
+
 export function extractFromUrl(pageUrl: string): Pick<
   RouteContext,
   "origin" | "destination" | "confidence"
 > {
   try {
     const url = new URL(pageUrl);
-    const segments = url.pathname.split("/");
+    const segments = url.pathname.replace(/\/$/, "").split("/");
     const dirIndex = segments.indexOf("dir");
     if (dirIndex < 0) {
       return { origin: null, destination: null, confidence: 0 };
     }
-    const routeSegments = segments
-      .slice(dirIndex + 1, dirIndex + 3)
-      .map((segment) => {
-        try {
-          return decodeURIComponent(segment);
-        } catch {
-          return segment;
-        }
-      });
-    const coordinatePairs = [...pageUrl.matchAll(/!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g)]
-      .map((match) => ({ longitude: Number(match[1]), latitude: Number(match[2]) }))
-      .filter(
-        (point) =>
-          Number.isFinite(point.latitude) && Number.isFinite(point.longitude)
-      );
-    const origin = toLocation(routeSegments[0] ?? null, coordinatePairs[0]);
-    const destination = toLocation(routeSegments[1] ?? null, coordinatePairs[1]);
+    const path = segments.slice(dirIndex + 1);
+    const fromQuery =
+      googleDirectionsApiUrl(url) &&
+      (url.searchParams.has("origin") || url.searchParams.has("destination"));
+    const stops = fromQuery
+      ? [
+          url.searchParams.get("origin") ?? "",
+          url.searchParams.get("destination") ?? ""
+        ]
+      : googlePathStops(path);
+    const data = fromQuery ? "" : googleRouteData(url);
+    const coordinatePairs = Array.from(
+      data.matchAll(/!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g),
+      (match) => googleCoordinates(Number(match[2]), Number(match[1]))
+    );
+    // Only bind positional metadata when every stop has a corresponding pair.
+    const points =
+      stops.every(Boolean) && coordinatePairs.length === stops.length
+        ? coordinatePairs
+        : [];
+    const origin = googleLocation(stops[0], points[0]);
+    const destination = stops.length > 1
+      ? googleLocation(stops.at(-1), points.at(-1))
+      : null;
     return {
       origin,
       destination,
@@ -261,6 +310,7 @@ export function detectTravelMode(
   if (provider === "waze") {
     return pageUrl.includes("/live-map/directions") ? "DRIVE" : "UNKNOWN";
   }
+
   if (provider === "amap") {
     try {
       const url = new URL(pageUrl);
@@ -272,9 +322,18 @@ export function detectTravelMode(
     }
   }
 
-  const encodedModes = [...pageUrl.matchAll(/!3e(\d+)/g)];
+  let modeData = pageUrl;
+  let queryMode = null;
+  if (provider === "google") {
+    const url = new URL(pageUrl);
+    if (googleDirectionsApiUrl(url)) queryMode = url.searchParams.get("travelmode");
+    modeData = googleRouteData(url);
+  }
+  if (queryMode !== null && queryMode !== "driving") return "UNKNOWN";
+  const encodedModes = [...modeData.matchAll(/!3e(\d+)/g)];
   const encodedMode = encodedModes.at(-1)?.[1];
   if (encodedMode !== undefined) return encodedMode === "0" ? "DRIVE" : "UNKNOWN";
+  if (queryMode === "driving") return "DRIVE";
 
   const selectedLabel = selectedTravelModeLabel(doc);
   if (NON_DRIVING_MODE_LABELS.some((label) => selectedLabel.includes(label))) {

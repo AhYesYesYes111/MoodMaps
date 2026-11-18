@@ -57,7 +57,7 @@ function looksPrecise(value: string): boolean {
     /\b(?:street|st|road|rd|avenue|ave|boulevard|blvd|lane|ln|drive|dr|highway|hwy|route|rte)\b\.?$/i.test(
       value
     ) ||
-    /(?:机场|機場|车站|車站|火车站|火車站|大学|大學|学校|學校|医院|醫院|酒店|商场|商場|大厦|大廈|公寓|公园|公園|广场|廣場|博物馆|博物館|体育场|體育場|剧院|劇院|影院|餐厅|餐廳|咖啡馆|咖啡館|市场|市場|教堂|寺|清真寺|图书馆|圖書館|纪念碑|紀念碑|海滩|海灘|花园|花園|办公室|辦公室|街道|道路|路|街|巷|弄|号|號)$/.test(
+    /(?:机场|機場|车站|車站|火车站|火車站|大学|大學|学校|學校|医院|醫院|酒店|商场|商場|大厦|大廈|公寓|公园|公園|广场|廣場|博物馆|博物館|体育场|體育場|剧院|劇院|影院|餐厅|餐廳|咖啡馆|咖啡館|市场|市場|超市|夜市|教堂|寺|清真寺|图书馆|圖書館|纪念碑|紀念碑|海滩|海灘|花园|花園|办公室|辦公室|街道|道路|路|街|巷|弄|号|號)$/.test(
       value
     )
   );
@@ -149,6 +149,13 @@ const COMMON_CITY_NAMES = new Set(
   ].map((value) => value.toLocaleLowerCase())
 );
 
+// 区 / 區 also ends the names of apartment compounds, campuses and individual
+// attractions. Only recognize known districts when that is the sole suffix.
+const KNOWN_DISTRICTS = new Set([
+  "浦东新区", "浦東新區", "黄浦区", "黃浦區", "徐汇区", "徐匯區",
+  "静安区", "靜安區", "朝阳区", "朝陽區", "海淀区", "海淀區"
+]);
+
 function explicitlyAdministrative(value: string): boolean {
   return (
     /^(?:city|county|state|province|region|prefecture|municipality)\s+of\b/i.test(
@@ -157,7 +164,8 @@ function explicitlyAdministrative(value: string): boolean {
     /\b(?:city|county|province|region|prefecture|municipality)$/.test(
       value.toLocaleLowerCase()
     ) ||
-    /(?:市|省|州|县|縣|区|區|自治区|自治區|特别行政区|特別行政區)$/.test(
+    KNOWN_DISTRICTS.has(value) ||
+    /(?:市|省|州|县|縣|自治区|自治區|特别行政区|特別行政區)$/.test(
       value
     )
   );
@@ -173,7 +181,7 @@ function clearlyCoarseLocality(value: string): boolean {
 
 function looksLikeRegionQualifier(value: string): boolean {
   return (
-    explicitlyAdministrative(value) ||
+    (!looksPrecise(value) && explicitlyAdministrative(value)) ||
     /^[A-Z]{2,3}$/.test(value) ||
     COMMON_REGION_QUALIFIERS.has(value.toLocaleLowerCase())
   );
