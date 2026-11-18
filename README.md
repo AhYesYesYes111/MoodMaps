@@ -76,3 +76,7 @@ Mood Score is an experimental comfort estimate. It is not a safety, medical, or 
 - docs: product, API, scoring, privacy, review, and release materials.
 - scripts: repeatable build and packaging helpers.
 - analysis: extracted questionnaire evidence, an executed calibration notebook, and proposed model weights.
+
+## License
+
+Licensed under the [MIT License](LICENSE).
