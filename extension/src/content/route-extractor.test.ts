@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
+import manifest from "../../public/manifest.json";
 import {
   detectTravelMode,
   extractAmapFromDom,
@@ -128,6 +129,16 @@ describe("Google Maps route extraction", () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.85);
   });
 
+  it("stops scoring when the selected Google mode changes before the URL", () => {
+    const doc = document.implementation.createHTMLDocument();
+    doc.body.innerHTML = '<div data-travel_mode="2"><button role="radio" aria-checked="true">步行</button></div>';
+    expect(detectTravelMode("https://www.google.com/maps/dir/?api=1&travelmode=driving", doc)).toBe("UNKNOWN");
+    expect(detectTravelMode("https://www.google.com/maps/dir/A/B/data=!3e0", doc)).toBe("UNKNOWN");
+    doc.querySelector("div")!.setAttribute("data-travel_mode", "0");
+    expect(detectTravelMode("https://www.google.com/maps/dir/A/B/data=!3e2", doc)).toBe("UNKNOWN");
+    expect(detectTravelMode("https://www.google.com/maps/dir/A/B", doc)).toBe("DRIVE");
+  });
+
   it("does not analyze explicitly non-driving directions", () => {
     expect(
       detectTravelMode(
@@ -145,6 +156,38 @@ describe("Google Maps route extraction", () => {
 });
 
 describe("Apple Maps route extraction", () => {
+  it("retains valid endpoint coordinates in Apple's directions URLs", () => {
+    const base = "https://maps.apple.com/directions?";
+    const result = extractAppleFromUrl(base + new URLSearchParams({
+      source: "31.2330, 121.4753",
+      destination: "31.2410,121.4900",
+      mode: "driving"
+    }));
+    expect(result.origin).toMatchObject({ latitude: 31.233, longitude: 121.4753 });
+    expect(result.destination).toMatchObject({ latitude: 31.241, longitude: 121.49 });
+    const invalid = extractAppleFromUrl(base + "source=100,200&destination=10%20Main%20St");
+    expect(invalid.origin).toEqual({ text: "100,200" });
+    expect(invalid.destination).toEqual({ text: "10 Main St" });
+  });
+
+  it("can inject and recognize driving directions on Apple's mainland China host", () => {
+    const host = "https://maps.apple.com.cn";
+    const match = host + "/*";
+    expect(manifest.host_permissions).toContain(match);
+    expect(manifest.content_scripts.some((script) => script.matches.includes(match))).toBe(true);
+    const url = host + "/directions?" + new URLSearchParams({
+      source: "上海虹桥站",
+      destination: "上海浦东国际机场",
+      mode: "driving"
+    });
+    expect(extractRouteContext(url, document)).toMatchObject({
+      provider: "apple",
+      travelMode: "DRIVE",
+      origin: { text: "上海虹桥站" },
+      destination: { text: "上海浦东国际机场" }
+    });
+  });
+
   it("extracts the route endpoints and driving mode from the web URL", () => {
     const url =
       "https://maps.apple.com/directions?source=Penn+Station%2C+New+York%2C+NY&destination=Yale+University%2C+New+Haven%2C+CT&mode=driving";
@@ -214,6 +257,21 @@ describe("Waze route extraction", () => {
     expect(context.provider).toBe("waze");
     expect(context.travelMode).toBe("DRIVE");
   });
+
+  it("uses the selected Waze places when URL coordinates are incomplete or out of range", () => {
+    const doc = document.implementation.createHTMLDocument();
+    doc.body.innerHTML = ["Boston Common Garage", "Logan Airport"].map((name) =>
+      '<div class="wm-search"><div class="wm-search__selected">' +
+      '<span class="wm-search__primary">' + name + '</span></div></div>'
+    ).join("");
+    const route = extractRouteContext(
+      "https://www.waze.com/live-map/directions?from=ll.,-71&to=ll.91,181",
+      doc
+    );
+    expect(route.origin).toEqual({ text: "Boston Common Garage" });
+    expect(route.destination).toEqual({ text: "Logan Airport" });
+    expect(route.source).toBe("dom");
+  });
 });
 
 describe("Amap route extraction", () => {
@@ -252,6 +310,25 @@ describe("Amap route extraction", () => {
     );
     expect(context.provider).toBe("amap");
     expect(context.travelMode).toBe("DRIVE");
+  });
+
+  it("reads the current Amap directions URL and separates driving from other modes", () => {
+    document.body.innerHTML = "";
+    const url = "https://amap.com/ssr/dir?fname=北京南站&flat=39.865246&flon=116.378517" +
+      "&dname=清华大学&dlat=40.003213&dlon=116.326936&type=0";
+    expect(extractRouteContext(url, document)).toMatchObject({
+      origin: { text: "北京南站", latitude: 39.865246, longitude: 116.378517 },
+      destination: { text: "清华大学", latitude: 40.003213, longitude: 116.326936 },
+      travelMode: "DRIVE"
+    });
+    expect(detectTravelMode(url.replace("type=0", "type=1"), document)).toBe("UNKNOWN");
+    document.body.innerHTML =
+      '<div class="NavigationTypeSelector_active__test"><img alt="步行"></div>' +
+      '<input placeholder="请输入起点" value="北京南站"><input placeholder="请输入终点" value="清华大学">';
+    expect(detectTravelMode(url, document)).toBe("UNKNOWN");
+    expect(extractAmapFromDom(document)).toMatchObject({
+      origin: { text: "北京南站" }, destination: { text: "清华大学" }
+    });
   });
 
   it("does not treat Amap transit directions as driving", () => {

@@ -5,10 +5,20 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   MoodScoreComponentExplanation,
+  ObservedRoute,
   RouteBadgeViewState,
   RouteContext
 } from "../shared/types";
 import { App, chooseSelectedRouteId, percentageLabels } from "./App";
+
+const observedRoute: ObservedRoute = {
+  description: "via I-95 N",
+  durationMinutes: 125,
+  distanceMeters: 120000,
+  hasTolls: false,
+  withoutTrafficMinutes: null,
+  trafficSignal: "unknown"
+};
 
 describe("MoodMaps read-only popup", () => {
   let container: HTMLDivElement;
@@ -145,7 +155,7 @@ describe("MoodMaps read-only popup", () => {
     ).toBe(100);
   });
 
-  it("shows a clear error when a payload contains no confidently matched routes", async () => {
+  it("waits for visible cards and reports unmatched scores only after cards appear", async () => {
     const context: RouteContext = {
       provider: "google",
       origin: { text: "Penn Station" },
@@ -165,18 +175,21 @@ describe("MoodMaps read-only popup", () => {
         routes: []
       }
     };
+    const sendMessage = vi.fn(async () => context);
+    const addListener = vi.fn();
+    const getMapState = vi.fn(async () => mapState);
     await remountWithChrome({
       runtime: {
         id: "test-extension",
-        sendMessage: vi.fn(async () => context),
+        sendMessage,
         onMessage: {
-          addListener: vi.fn(),
+          addListener,
           removeListener: vi.fn()
         }
       },
       tabs: {
         query: vi.fn(async () => [{ id: 1 }]),
-        sendMessage: vi.fn(async () => mapState)
+        sendMessage: getMapState
       },
       storage: {
         local: {
@@ -186,6 +199,17 @@ describe("MoodMaps read-only popup", () => {
       }
     });
 
+    expect(container.textContent).toContain("No driving routes visible yet.");
+    expect(container.querySelector(".error-state")).toBeNull();
+    expect(sendMessage.mock.calls).toEqual([[{ type: "GET_CURRENT_ROUTE_CONTEXT" }]]);
+    expect(getMapState).not.toHaveBeenCalled();
+
+    const listener = addListener.mock.calls[0][0];
+    await act(async () => listener({
+      type: "ROUTE_CONTEXT_UPDATED",
+      payload: { ...context, observedRoutes: [observedRoute] }
+    }, { tab: { id: 1 } }));
+    expect(getMapState).toHaveBeenCalledOnce();
     expect(container.querySelector(".error-state")).not.toBeNull();
     expect(container.textContent).toContain(
       "could not reliably match a result to the current map routes"
@@ -196,6 +220,7 @@ describe("MoodMaps read-only popup", () => {
 
   it("does not offer retry for a non-retryable analysis error", async () => {
     const context: RouteContext = {
+      observedRoutes: [observedRoute],
       provider: "google",
       origin: { text: "Penn Station" },
       destination: { text: "Yale University" },
@@ -242,8 +267,53 @@ describe("MoodMaps read-only popup", () => {
     expect(container.querySelector(".error-state button")).toBeNull();
   });
 
+  it("keeps a route update that arrives before the opening lookup completes", async () => {
+    let finishLookup!: (value: null) => void;
+    const lookup = new Promise<null>((resolve) => { finishLookup = resolve; });
+    const addListener = vi.fn();
+    await remountWithChrome({
+      runtime: { id: "test", sendMessage: vi.fn(() => lookup),
+        onMessage: { addListener, removeListener: vi.fn() } },
+      tabs: { query: vi.fn(async () => [{ id: 1 }]) },
+      storage: { local: { get: vi.fn(async () => ({})) } }
+    });
+    const context: RouteContext = {
+      provider: "google", origin: { text: "Boston" }, destination: { text: "Cambridge" },
+      travelMode: "DRIVE", source: "dom", confidence: 0.9,
+      departureTime: "", pageUrl: "https://www.google.com/maps/dir/Boston/Cambridge"
+    };
+    await act(async () => addListener.mock.calls[0][0](
+      { type: "ROUTE_CONTEXT_UPDATED", payload: context }, { tab: { id: 1 } }
+    ));
+    await act(async () => finishLookup(null));
+    expect(container.textContent).toContain("No driving routes visible yet.");
+  });
+
+  it("keeps the map's latest analysis state when an older snapshot finally arrives", async () => {
+    let finishRead!: (value: RouteBadgeViewState) => void;
+    const snapshot = new Promise<RouteBadgeViewState>((resolve) => { finishRead = resolve; });
+    const addListener = vi.fn();
+    const context: RouteContext = {
+      provider: "google", origin: { text: "Boston" }, destination: { text: "Cambridge" },
+      travelMode: "DRIVE", source: "dom", confidence: 0.9, observedRoutes: [observedRoute],
+      departureTime: "", pageUrl: "https://www.google.com/maps/dir/Boston/Cambridge"
+    };
+    await remountWithChrome({
+      runtime: { id: "test", sendMessage: vi.fn(async () => context),
+        onMessage: { addListener, removeListener: vi.fn() } },
+      tabs: { query: vi.fn(async () => [{ id: 1 }]), sendMessage: vi.fn(() => snapshot) },
+      storage: { local: { get: vi.fn(async () => ({})) } }
+    });
+    await act(async () => addListener.mock.calls[0][0]({
+      type: "ROUTE_BADGE_STATE_UPDATED", payload: { payload: null, state: "error", selectedRouteId: null }
+    }, { tab: { id: 1 } }));
+    await act(async () => finishRead({ payload: null, state: "loading", selectedRouteId: null }));
+    expect(container.querySelector(".error-state button")).not.toBeNull();
+  });
+
   it("uses the active provider in Chinese route copy", async () => {
     const context: RouteContext = {
+      observedRoutes: [observedRoute],
       provider: "google",
       origin: { text: "Penn Station" },
       destination: { text: "Yale University" },
@@ -293,6 +363,12 @@ describe("MoodMaps read-only popup", () => {
 
     const context: RouteContext = {
       provider: "amap",
+      observedRoutes: [{
+        ...observedRoute,
+        description: "途经：二环、西直门北大街、学院路",
+        durationMinutes: 37,
+        distanceMeters: 17000
+      }],
       origin: { text: "北京南站", latitude: 39.865246, longitude: 116.378517 },
       destination: {
         text: "清华大学",

@@ -74,22 +74,24 @@ function googlePathStops(segments: string[]): string[] {
   return stops;
 }
 
-function googleCoordinates(latitude: number, longitude: number) {
+function validCoordinates(latitude: number, longitude: number) {
   if (Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
     return { latitude, longitude };
   }
   return undefined;
 }
 
-function googleLocation(
-  text: string | undefined,
+const COORDINATE_PAIR = /^\s*([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*$/;
+
+function urlLocation(
+  text: string | null | undefined,
   coordinates?: { latitude: number; longitude: number }
 ): LocationInput | null {
   if (!text) return null;
-  const point = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/.exec(text);
+  const point = COORDINATE_PAIR.exec(text);
   return toLocation(
     text,
-    point ? googleCoordinates(Number(point[1]), Number(point[2])) : coordinates
+    point ? validCoordinates(Number(point[1]), Number(point[2])) : coordinates
   );
 }
 
@@ -117,16 +119,16 @@ export function extractFromUrl(pageUrl: string): Pick<
     const data = fromQuery ? "" : googleRouteData(url);
     const coordinatePairs = Array.from(
       data.matchAll(/!1d(-?\d+(?:\.\d+)?)!2d(-?\d+(?:\.\d+)?)/g),
-      (match) => googleCoordinates(Number(match[2]), Number(match[1]))
+      (match) => validCoordinates(Number(match[2]), Number(match[1]))
     );
     // Only bind positional metadata when every stop has a corresponding pair.
     const points =
       stops.every(Boolean) && coordinatePairs.length === stops.length
         ? coordinatePairs
         : [];
-    const origin = googleLocation(stops[0], points[0]);
+    const origin = urlLocation(stops[0], points[0]);
     const destination = stops.length > 1
-      ? googleLocation(stops.at(-1), points.at(-1))
+      ? urlLocation(stops.at(-1), points.at(-1))
       : null;
     return {
       origin,
@@ -138,21 +140,14 @@ export function extractFromUrl(pageUrl: string): Pick<
   }
 }
 
-function searchParamLocation(
-  url: URL,
-  key: string
-): LocationInput | null {
-  return toLocation(url.searchParams.get(key));
-}
-
 export function extractAppleFromUrl(pageUrl: string): Pick<
   RouteContext,
   "origin" | "destination" | "confidence"
 > {
   try {
     const url = new URL(pageUrl);
-    const origin = searchParamLocation(url, "source");
-    const destination = searchParamLocation(url, "destination");
+    const origin = urlLocation(url.searchParams.get("source"));
+    const destination = urlLocation(url.searchParams.get("destination"));
     return {
       origin,
       destination,
@@ -165,14 +160,13 @@ export function extractAppleFromUrl(pageUrl: string): Pick<
 
 function coordinateLocation(value: string | null): LocationInput | null {
   if (!value?.startsWith("ll.")) return null;
-  const [latitudeText, longitudeText] = value.slice(3).split(",");
-  const latitude = Number(latitudeText);
-  const longitude = Number(longitudeText);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  const pair = COORDINATE_PAIR.exec(value.slice(3));
+  if (!pair) return null;
+  const point = validCoordinates(Number(pair[1]), Number(pair[2]));
+  if (!point) return null;
   return {
-    text: latitude.toFixed(5) + ", " + longitude.toFixed(5),
-    latitude,
-    longitude
+    text: point.latitude.toFixed(5) + ", " + point.longitude.toFixed(5),
+    ...point
   };
 }
 
@@ -194,23 +188,17 @@ export function extractWazeFromUrl(pageUrl: string): Pick<
   }
 }
 
-function amapCoordinates(
-  value: string | null
-): { latitude: number; longitude: number } | undefined {
-  if (!value) return undefined;
-  const [longitudeText, latitudeText] = value.split(",");
-  const latitude = Number(latitudeText);
-  const longitude = Number(longitudeText);
-  return Number.isFinite(latitude) && Number.isFinite(longitude)
-    ? { latitude, longitude }
-    : undefined;
-}
-
 function amapLocation(url: URL, prefix: "from" | "to"): LocationInput | null {
-  const coordinates = amapCoordinates(
-    url.searchParams.get(prefix + "[lnglat]")
-  );
-  const name = url.searchParams.get(prefix + "[name]");
+  const params = url.searchParams;
+  const currentPage = /^\/ssr\/dir\/?$/.test(url.pathname);
+  const shortPrefix = prefix === "from" ? "f" : "d";
+  const [longitude, latitude] = currentPage
+    ? [params.get(shortPrefix + "lon"), params.get(shortPrefix + "lat")]
+    : (params.get(prefix + "[lnglat]") ?? "").split(",");
+  const coordinates = latitude?.trim() && longitude?.trim()
+    ? validCoordinates(Number(latitude), Number(longitude))
+    : undefined;
+  const name = params.get(currentPage ? shortPrefix + "name" : prefix + "[name]");
   if (name) return toLocation(name, coordinates);
   if (!coordinates) return null;
   return {
@@ -228,7 +216,7 @@ export function extractAmapFromUrl(pageUrl: string): Pick<
 > {
   try {
     const url = new URL(pageUrl);
-    if (!url.pathname.startsWith("/dir")) {
+    if (!/^\/(?:ssr\/)?dir\/?$/.test(url.pathname)) {
       return { origin: null, destination: null, confidence: 0 };
     }
     const origin = amapLocation(url, "from");
@@ -315,7 +303,14 @@ export function detectTravelMode(
     try {
       const url = new URL(pageUrl);
       const type = url.searchParams.get("type");
-      if (type) return type === "car" ? "DRIVE" : "UNKNOWN";
+      if (/^\/ssr\/dir\/?$/.test(url.pathname)) {
+        const selected = doc.querySelector<HTMLImageElement>(
+          '[class*="NavigationTypeSelector_active__"] img[alt]'
+        );
+        if (selected) return selected.alt === "驾车" ? "DRIVE" : "UNKNOWN";
+        return type === "0" ? "DRIVE" : "UNKNOWN";
+      }
+      if (/^\/dir\/?$/.test(url.pathname) && type === "car") return "DRIVE";
       return "UNKNOWN";
     } catch {
       return "UNKNOWN";
@@ -324,7 +319,15 @@ export function detectTravelMode(
 
   let modeData = pageUrl;
   let queryMode = null;
+  let selectedGoogleMode: string | null = null;
   if (provider === "google") {
+    const selectedControl = doc.querySelector(
+      '[data-travel_mode][aria-checked="true"], [data-travel_mode] [role="radio"][aria-checked="true"]'
+    );
+    selectedGoogleMode = selectedControl?.closest("[data-travel_mode]")
+      ?.getAttribute("data-travel_mode") ?? null;
+    // The selected control updates before the directions URL during a mode switch.
+    if (selectedGoogleMode !== null && selectedGoogleMode !== "0") return "UNKNOWN";
     const url = new URL(pageUrl);
     if (googleDirectionsApiUrl(url)) queryMode = url.searchParams.get("travelmode");
     modeData = googleRouteData(url);
@@ -333,7 +336,7 @@ export function detectTravelMode(
   const encodedModes = [...modeData.matchAll(/!3e(\d+)/g)];
   const encodedMode = encodedModes.at(-1)?.[1];
   if (encodedMode !== undefined) return encodedMode === "0" ? "DRIVE" : "UNKNOWN";
-  if (queryMode === "driving") return "DRIVE";
+  if (queryMode === "driving" || selectedGoogleMode === "0") return "DRIVE";
 
   const selectedLabel = selectedTravelModeLabel(doc);
   if (NON_DRIVING_MODE_LABELS.some((label) => selectedLabel.includes(label))) {
@@ -493,10 +496,10 @@ export function extractAmapFromDom(doc: Document): Pick<
   "origin" | "destination" | "confidence"
 > {
   const origin = toLocation(
-    doc.querySelector<HTMLInputElement>("#dir_from_ipt")?.value ?? null
+    doc.querySelector<HTMLInputElement>('#dir_from_ipt, input[placeholder="请输入起点"]')?.value ?? null
   );
   const destination = toLocation(
-    doc.querySelector<HTMLInputElement>("#dir_to_ipt")?.value ?? null
+    doc.querySelector<HTMLInputElement>('#dir_to_ipt, input[placeholder="请输入终点"]')?.value ?? null
   );
   return {
     origin,

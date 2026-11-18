@@ -97,7 +97,14 @@ export interface RouteBadgeAssignment {
 
 export type BadgeRenderState = "idle" | "loading" | "error";
 
-function isSelectedRouteCard(element: HTMLElement): boolean {
+function isSelectedRouteCard({ element, provider }: DetectedRouteCard): boolean {
+  if (provider === "amap" && element.matches('[class*="CarOrWalkRoutePlanItem_selected__"]')) {
+    return true;
+  }
+  if (provider === "google") {
+    const tripRole = element.closest("[data-trip-index]")?.getAttribute("role");
+    if (tripRole === "link" || tripRole === "button") return tripRole === "link";
+  }
   const selector =
     '[aria-selected="true"], [aria-current]:not([aria-current="false"])';
   return (
@@ -191,16 +198,30 @@ function isVisible(element: HTMLElement): boolean {
   return style.display !== "none" && style.visibility !== "hidden";
 }
 
-function findDistanceElement(card: HTMLElement): HTMLElement | null {
+// A standalone "m" can mean either minutes or meters on a generic route card.
+function hasAmbiguousUnit(element: HTMLElement): boolean {
+  return /^\d+\s*m$/i.test(normalizedText(element.textContent ?? ""));
+}
+
+function findDistanceElement(
+  card: HTMLElement,
+  durationElement: HTMLElement
+): HTMLElement | null {
+  const ambiguousTime = hasAmbiguousUnit(durationElement);
   const candidates = Array.from(
     card.querySelectorAll<HTMLElement>("span, div")
   );
   return (
     candidates
       .filter((element) => {
-      if (isMoodMapsUi(element)) return false;
-      const text = normalizedText(element.textContent ?? "");
-      return text.length <= 40 && DISTANCE_PATTERN.test(text);
+        if (
+          element.contains(durationElement) ||
+          durationElement.contains(element) ||
+          isMoodMapsUi(element)
+        ) return false;
+        const text = normalizedText(element.textContent ?? "");
+        return text.length <= 40 && DISTANCE_PATTERN.test(text) &&
+          !(ambiguousTime && hasAmbiguousUnit(element)) && isVisible(element);
       })
       .sort(
         (first, second) =>
@@ -224,7 +245,7 @@ function findCardAncestor(
       rect.height >= 72 &&
       rect.height <= 360 &&
       text.length <= 1200 &&
-      findDistanceElement(candidate) !== null
+      findDistanceElement(candidate, durationElement) !== null
     ) {
       return candidate;
     }
@@ -247,12 +268,19 @@ function findGenericRouteCards(
     if (isMoodMapsUi(element)) return false;
     const text = normalizedText(element.textContent ?? "");
     return text.length <= 32 && parseDurationMinutes(text) !== null && isVisible(element);
-  });
+  }).sort((a, b) => Number(hasAmbiguousUnit(a)) - Number(hasAmbiguousUnit(b)));
 
   const cards = new Map<HTMLElement, DetectedRouteCard>();
   for (const durationElement of durationElements) {
-    const card = findCardAncestor(durationElement, root);
+    const trip = provider === "google"
+      ? durationElement.closest<HTMLElement>(
+          '[data-trip-index][role="link"], [data-trip-index][role="button"]'
+        )
+      : null;
+    const card = trip ?? findCardAncestor(durationElement, root);
     if (!card || cards.has(card) || !isVisible(card)) continue;
+    const distanceElement = findDistanceElement(card, durationElement);
+    if (!distanceElement && hasAmbiguousUnit(durationElement)) continue;
     const durationMinutes = parseDurationMinutes(durationElement.textContent ?? "");
     if (durationMinutes === null) continue;
     cards.set(card, {
@@ -262,7 +290,7 @@ function findGenericRouteCards(
       routeDescription: findRouteDescription(card),
       durationMinutes,
       durationElement,
-      distanceElement: findDistanceElement(card)
+      distanceElement
     });
   }
 
@@ -284,7 +312,7 @@ function siteRouteCard(
     return null;
   }
   const durationMinutes = parseDurationMinutes(
-    durationElement.textContent ?? ""
+    durationElement.innerText ?? durationElement.textContent ?? ""
   );
   if (durationMinutes === null) return null;
   return {
@@ -367,21 +395,23 @@ function findWazeRouteCards(doc: Document): DetectedRouteCard[] {
 
 function findAmapRouteCards(doc: Document): DetectedRouteCard[] {
   return Array.from(
-    doc.querySelectorAll<HTMLElement>(".planTitle.dirtag")
+    doc.querySelectorAll<HTMLElement>('.planTitle.dirtag, [class*="CarOrWalkRoutePlanItem_routePlanItem__"]')
   ).flatMap((element, index) => {
     const metrics = Array.from(
       element.querySelectorAll<HTMLElement>(".dir_base_info .dir_base")
     );
     const durationElement =
+      element.querySelector<HTMLElement>("[data-duration]") ??
       metrics.find(
         (candidate) =>
           parseDurationMinutes(candidate.textContent ?? "") !== null
       ) ?? null;
     const distanceElement =
+      element.querySelector<HTMLElement>("[data-distance]") ??
       metrics.find((candidate) =>
         DISTANCE_PATTERN.test(normalizedText(candidate.textContent ?? ""))
       ) ?? null;
-    const passBy = element.querySelector<HTMLElement>(".dir_passby");
+    const passBy = element.querySelector<HTMLElement>('.dir_passby, [class*="CarOrWalkRoutePlanItem_roadRow__"]');
     const routeName = normalizedText(passBy?.textContent ?? "");
     const description = routeName || "高德路线 " + (index + 1);
     const card = siteRouteCard(
@@ -571,7 +601,7 @@ function badgePlacement(card: DetectedRouteCard): {
     if (details) return { parent: details, before: null };
   }
   if (card.provider === "amap") {
-    const sidebar = card.element.querySelector<HTMLElement>(".sidebar");
+    const sidebar = card.element.querySelector<HTMLElement>(":scope > .sidebar");
     return { parent: card.element, before: sidebar };
   }
 
@@ -828,7 +858,7 @@ function openScoreExplainer(
   const viewport = doc.defaultView ?? window;
   const onOutsidePointerDown = (event: Event) => {
     const target = event.target;
-    if (target instanceof Node && !panel.contains(target) && target !== anchor) {
+    if (target instanceof Node && !panel.contains(target) && !anchor.contains(target)) {
       closeScoreExplainer(doc);
     }
   };
@@ -839,12 +869,16 @@ function openScoreExplainer(
     }
   };
   const onViewportChange = () => closeScoreExplainer(doc);
+  const onScroll = (event: Event) => {
+    if (event.target instanceof Node && panel.contains(event.target)) return;
+    closeScoreExplainer(doc);
+  };
   const close = () => {
     panel.remove();
     anchor.setAttribute("aria-expanded", "false");
     doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
     doc.removeEventListener("keydown", onKeyDown, true);
-    doc.removeEventListener("scroll", onViewportChange, true);
+    doc.removeEventListener("scroll", onScroll, true);
     viewport.removeEventListener("resize", onViewportChange);
     openScoreExplainers.delete(doc);
   };
@@ -865,7 +899,7 @@ function openScoreExplainer(
   panel.addEventListener("click", (event) => event.stopPropagation());
   doc.addEventListener("pointerdown", onOutsidePointerDown, true);
   doc.addEventListener("keydown", onKeyDown, true);
-  doc.addEventListener("scroll", onViewportChange, true);
+  doc.addEventListener("scroll", onScroll, true);
   viewport.addEventListener("resize", onViewportChange);
   panel.focus({ preventScroll: true });
 }
@@ -1089,7 +1123,7 @@ export function renderRouteBadges(options: {
   );
   const selectedAssignment =
     assignments.find((assignment) =>
-      isSelectedRouteCard(cards[assignment.cardIndex].element)
+      isSelectedRouteCard(cards[assignment.cardIndex])
     ) ?? [...assignments].sort((first, second) => first.cardIndex - second.cardIndex)[0];
 
   cards.forEach((card, index) => {

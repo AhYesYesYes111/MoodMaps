@@ -145,6 +145,7 @@ export interface RouteBadgePayload {
 }
 
 export interface RouteBadgeViewState {
+  routeFingerprint?: string;
   payload: RouteBadgePayload | null;
   state: "idle" | "loading" | "error";
   selectedRouteId: string | null;
@@ -157,5 +158,5 @@ export type ExtensionMessage =
   | { type: "ANALYZE_ROUTE_BADGES"; payload: RouteContext }
   | { type: "GET_ROUTE_BADGE_STATE" }
   | { type: "ROUTE_BADGE_STATE_UPDATED"; payload: RouteBadgeViewState }
-  | { type: "UPDATE_ROUTE_BADGES"; payload: RouteBadgePayload }
+  | { type: "UPDATE_ROUTE_BADGES"; payload: RouteBadgePayload; routeFingerprint: string }
   | { type: "CLEAR_ROUTE_BADGES" };

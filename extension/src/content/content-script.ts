@@ -63,7 +63,9 @@ function readRouteContext(): RouteContext {
           (index + 1)
         : mapProviderName(context.provider) + " route " + (index + 1)),
     durationMinutes: card.durationMinutes,
-    distanceMeters: parseDistanceMeters(card.distanceElement?.textContent ?? ""),
+    distanceMeters: parseDistanceMeters(
+      card.distanceElement?.innerText ?? card.distanceElement?.textContent ?? ""
+    ),
     hasTolls: /\btolls?\b|\bcongestion charges?\b|收费|收費/i.test(card.text),
     withoutTrafficMinutes: parseWithoutTrafficMinutes(card.text),
     trafficSignal: trafficSignalFromText(card.text)
@@ -82,7 +84,7 @@ async function sendRuntimeMessage<T>(
 }
 
 function visibleBadgePayload(): RouteBadgePayload | null {
-  if (!lastBadgePayload || detectedRouteCards === 0) return lastBadgePayload;
+  if (!lastBadgePayload || detectedRouteCards === 0) return null;
   const visible = new Set(assignedRouteIds);
   return {
     ...lastBadgePayload,
@@ -97,12 +99,14 @@ function visibleBadgePayload(): RouteBadgePayload | null {
 
 function clearRouteAssignments(): void {
   detectedRouteCards = 0;
+  selectedRouteId = null;
   assignedRouteIds = [];
   assignedRouteDescriptions.clear();
 }
 
 function currentBadgeViewState(): RouteBadgeViewState {
   return {
+    routeFingerprint: lastFingerprint,
     payload: visibleBadgePayload(),
     state: badgeState,
     selectedRouteId
@@ -112,7 +116,7 @@ function currentBadgeViewState(): RouteBadgeViewState {
 function publishBadgeViewState(): void {
   const state = currentBadgeViewState();
   const fingerprint =
-    (state.payload?.generatedAt ?? "none") +
+    state.routeFingerprint + "|" + (state.payload?.generatedAt ?? "none") +
     "|" +
     (state.payload?.routes
       .map((route) => route.routeId + ":" + route.description)
@@ -166,26 +170,22 @@ function renderBadgeLayer(): void {
   ) {
     analysisRequestId += 1;
     activeAnalysisFingerprint = "";
+    autoAnalysisGate.reset();
+    scheduleRefresh();
   }
 
-  if (
-    lastBadgePayload &&
-    lastBadgePayload.contextSignature !== signatureFromContext(context)
-  ) {
+  if (currentFingerprint !== lastFingerprint ||
+      (lastBadgePayload && lastBadgePayload.contextSignature !== signatureFromContext(context))) {
     lastBadgePayload = null;
     clearRouteAssignments();
     autoAnalysisGate.reset();
     badgeState = canAutoAnalyze(context) ? "loading" : "idle";
-  } else if (
-    !lastBadgePayload &&
-    currentFingerprint !== lastFingerprint &&
-    canAutoAnalyze(context)
-  ) {
-    badgeState = "loading";
+    scheduleRefresh();
   }
 
   if (!context.origin || !context.destination || context.travelMode !== "DRIVE") {
-    selectedRouteId = null;
+    lastBadgePayload = null;
+    badgeState = "idle";
     clearRouteAssignments();
     closeScoreExplainer();
     document
@@ -246,10 +246,10 @@ async function analyzeContext(
       payload: context
     } satisfies ExtensionMessage);
 
-    if (
-      requestId !== analysisRequestId ||
-      routeFingerprint(readRouteContext()) !== expectedFingerprint
-    ) {
+    if (requestId !== analysisRequestId) return;
+    if (routeFingerprint(readRouteContext()) !== expectedFingerprint) {
+      autoAnalysisGate.reset();
+      scheduleRefresh();
       return;
     }
     if (!result) throw new Error("Extension context is unavailable.");
@@ -291,7 +291,10 @@ function connectObserver(): void {
     attributeFilter: [
       "value",
       "class",
+      "role",
       "aria-label",
+      "aria-checked",
+      "aria-pressed",
       "aria-current",
       "aria-selected"
     ]
@@ -333,17 +336,31 @@ function scheduleRefresh(): void {
 
 const routeObserver = new MutationObserver(scheduleRefresh);
 const rootLifecycleObserver = new MutationObserver((records) => {
-  if (!lifecycleMutationNeedsReconnect(records, observedRoot)) return;
-  connectObserver();
-  scheduleRefresh();
+  if (lifecycleMutationNeedsReconnect(records, observedRoot)) {
+    connectObserver();
+    scheduleRefresh();
+  } else if (records.some(({ type, target }) =>
+    type === "attributes" && target instanceof Element &&
+    !observedRoot?.contains(target) && target.closest("[data-travel_mode], [data-travel-mode]")
+  )) {
+    // Google Maps can put its travel-mode controls outside the route list.
+    scheduleRefresh();
+  }
 });
 connectObserver();
 rootLifecycleObserver.observe(document.documentElement, {
   childList: true,
-  subtree: true
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["aria-checked", "aria-pressed", "aria-selected"]
 });
 window.addEventListener("popstate", scheduleRefresh);
 window.addEventListener("hashchange", scheduleRefresh);
+// Map apps also change the active history entry via pushState or replaceState,
+// which need not change the DOM or dispatch popstate.
+(window as Window & { navigation?: EventTarget }).navigation?.addEventListener(
+  "currententrychange", scheduleRefresh
+);
 
 chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse) => {
@@ -352,15 +369,27 @@ chrome.runtime.onMessage.addListener(
       return;
     }
     if (message.type === "GET_ROUTE_BADGE_STATE") {
+      const context = readRouteContext();
+      const fingerprint = routeFingerprint(context);
+      if (fingerprint !== lastFingerprint) {
+        scheduleRefresh();
+        sendResponse({
+          routeFingerprint: fingerprint, payload: null, selectedRouteId: null,
+          state: canAutoAnalyze(context) ? "loading" : "idle"
+        } satisfies RouteBadgeViewState);
+        return;
+      }
       sendResponse(currentBadgeViewState());
       return;
     }
     if (message.type === "UPDATE_ROUTE_BADGES") {
+      const context = readRouteContext();
+      if (message.routeFingerprint !== routeFingerprint(context)) return;
       analysisRequestId += 1;
       activeAnalysisFingerprint = "";
       lastBadgePayload = message.payload;
       badgeState = "idle";
-      autoAnalysisGate.markAnalyzed(readRouteContext());
+      autoAnalysisGate.markAnalyzed(context);
       renderBadgeLayer();
       return;
     }

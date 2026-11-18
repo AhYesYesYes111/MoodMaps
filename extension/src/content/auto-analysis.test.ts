@@ -17,6 +17,14 @@ function context(overrides: Partial<RouteContext> = {}): RouteContext {
     source: "url",
     confidence: 0.93,
     pageUrl: "https://www.google.com/maps/dir/Penn/Yale",
+    observedRoutes: [{
+      description: "via I-95 N",
+      durationMinutes: 246,
+      distanceMeters: 368540,
+      hasTolls: false,
+      withoutTrafficMinutes: null,
+      trafficSignal: "unknown"
+    }],
     ...overrides
   };
 }
@@ -55,26 +63,14 @@ describe("automatic route analysis", () => {
     expect(gate.shouldAnalyze(context({ confidence: 0.85 }))).toBe(true);
   });
 
-  it("analyzes again when Google Maps route cards finish loading", () => {
+  it("analyzes once cards are visible, including after they disappear and return", () => {
     const gate = new AutoAnalysisGate();
+    expect(gate.shouldAnalyze(context({ observedRoutes: undefined }))).toBe(false);
+    expect(gate.shouldAnalyze(context({ observedRoutes: [] }))).toBe(false);
     expect(gate.shouldAnalyze(context())).toBe(true);
     expect(gate.shouldAnalyze(context())).toBe(false);
-    expect(
-      gate.shouldAnalyze(
-        context({
-          observedRoutes: [
-            {
-              description: "via I-95 N",
-              durationMinutes: 246,
-              distanceMeters: 368540,
-              hasTolls: false,
-              withoutTrafficMinutes: null,
-              trafficSignal: "unknown"
-            }
-          ]
-        })
-      )
-    ).toBe(true);
+    expect(gate.shouldAnalyze(context({ observedRoutes: [] }))).toBe(false);
+    expect(gate.shouldAnalyze(context())).toBe(true);
   });
 
   it("analyzes again when traffic inputs change without an ETA change", () => {

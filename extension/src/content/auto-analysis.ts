@@ -69,13 +69,17 @@ export class RefreshDebouncer {
   }
 }
 
-export function canAutoAnalyze(context: RouteContext): boolean {
+export function hasDrivingEndpoints(context: RouteContext | null): boolean {
   return Boolean(
-    context.origin?.text.trim() &&
+    context?.origin?.text.trim() &&
       context.destination?.text.trim() &&
       context.travelMode === "DRIVE" &&
       context.confidence >= 0.6
   );
+}
+
+export function canAutoAnalyze(context: RouteContext | null): boolean {
+  return hasDrivingEndpoints(context) && Boolean(context?.observedRoutes?.length);
 }
 
 export class AutoAnalysisGate {

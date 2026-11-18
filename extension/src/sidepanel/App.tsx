@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canAutoAnalyze, hasDrivingEndpoints, routeFingerprint } from "../content/auto-analysis";
 import { MOOD_SCORE_COMPONENTS } from "../scoring/scoring";
 import {
   defaultUiLanguage,
@@ -28,15 +29,6 @@ type ViewState = "detecting" | "loading" | "results" | "empty" | "error";
 
 function isExtensionRuntime(): boolean {
   return typeof chrome !== "undefined" && Boolean(chrome.runtime?.id);
-}
-
-function canAnalyze(context: RouteContext | null): context is RouteContext {
-  return Boolean(
-    context?.origin?.text.trim() &&
-      context.destination?.text.trim() &&
-      context.travelMode === "DRIVE" &&
-      context.confidence >= 0.6
-  );
 }
 
 function percentage(value: number): string {
@@ -124,6 +116,8 @@ interface SidepanelCopy {
   emptyEyebrow: string;
   emptyTitle: string;
   emptyBody: string;
+  noCardsTitle: string;
+  noCardsBody: string;
   errorEyebrow: string;
   errorTitle: string;
   errorFallback: string;
@@ -173,6 +167,8 @@ function sidepanelCopy(
           ? "GOOGLE 地图 · APPLE 地图 · WAZE · 高德地图"
           : providerName,
       emptyTitle: "请先规划一条驾车路线。",
+      noCardsTitle: "地图上暂无可评分的驾车路线。",
+      noCardsBody: "地图显示路线和预计用时后，MoodMaps 会自动评分。",
       emptyBody:
         "MoodMaps 会直接读取" +
         providerName +
@@ -221,6 +217,8 @@ function sidepanelCopy(
     otherRoutes: "Other routes",
     emptyEyebrow: "GOOGLE MAPS · APPLE MAPS · WAZE · AMAP",
     emptyTitle: "Plan a driving route first.",
+    noCardsTitle: "No driving routes visible yet.",
+    noCardsBody: "MoodMaps will score the routes when the map shows their travel times.",
     emptyBody:
       "MoodMaps reads the route already open in a supported map. There is no second origin or destination form to fill in here.",
     errorEyebrow: "ROUTE UNAVAILABLE",
@@ -478,6 +476,11 @@ function OtherRoutes(props: {
   );
 }
 
+function matchesRouteContext(view: RouteBadgeViewState, context: RouteContext): boolean {
+  if (view.routeFingerprint && view.routeFingerprint !== routeFingerprint(context)) return false;
+  return !view.payload || view.payload.contextSignature === signatureFromContext(context);
+}
+
 export function App() {
   const [context, setContext] = useState<RouteContext | null>(null);
   const [badgeView, setBadgeView] = useState<RouteBadgeViewState>({
@@ -495,6 +498,7 @@ export function App() {
   const provider = context?.provider ?? "unknown";
   const copy = sidepanelCopy(provider, language);
   const chinese = usesChineseUi(language);
+  const noVisibleRoutes = hasDrivingEndpoints(context) && !context?.observedRoutes?.length;
 
   const selectedRoute = useMemo(() => {
     const routes = badgeView.payload?.routes ?? [];
@@ -517,6 +521,10 @@ export function App() {
     nextBadgeView: RouteBadgeViewState,
     currentContext: RouteContext | null
   ): void {
+    if (!canAutoAnalyze(currentContext)) {
+      setView("empty");
+      return;
+    }
     selectedRouteIdRef.current = nextBadgeView.selectedRouteId;
     setBadgeView(nextBadgeView);
     if (nextBadgeView.payload) {
@@ -527,10 +535,6 @@ export function App() {
         setError(null);
         setView("results");
       }
-      return;
-    }
-    if (!canAnalyze(currentContext)) {
-      setView("empty");
       return;
     }
     if (nextBadgeView.state === "error") {
@@ -557,14 +561,7 @@ export function App() {
       setLanguage(defaultUiLanguage(nextContext?.provider ?? "unknown"));
     }
 
-    if (!isExtensionRuntime()) {
-      selectedRouteIdRef.current = null;
-      setBadgeView({ payload: null, state: "idle", selectedRouteId: null });
-      setView("empty");
-      return;
-    }
-
-    if (!canAnalyze(nextContext)) {
+    if (!isExtensionRuntime() || !nextContext || !canAutoAnalyze(nextContext)) {
       selectedRouteIdRef.current = null;
       setBadgeView({ payload: null, state: "idle", selectedRouteId: null });
       setView("empty");
@@ -583,18 +580,10 @@ export function App() {
             type: "GET_ROUTE_BADGE_STATE"
           } satisfies ExtensionMessage)
           .catch(() => null)) as RouteBadgeViewState | null;
-        if (
-          mapState?.payload &&
-          mapState.payload.contextSignature === signatureFromContext(nextContext)
-        ) {
-          if (requestId !== requestRef.current) return;
+        if (requestId !== requestRef.current) return;
+        if (mapState && matchesRouteContext(mapState, nextContext) &&
+            (mapState.payload || mapState.state === "loading")) {
           showBadgeView(mapState, nextContext);
-          return;
-        }
-        if (mapState?.state === "loading") {
-          if (requestId !== requestRef.current) return;
-          setBadgeView(mapState);
-          setView("loading");
           return;
         }
       }
@@ -620,7 +609,8 @@ export function App() {
         await chrome.tabs
           .sendMessage(tabId, {
             type: "UPDATE_ROUTE_BADGES",
-            payload: result.value
+            payload: result.value,
+            routeFingerprint: routeFingerprint(nextContext)
           } satisfies ExtensionMessage)
           .catch(() => undefined);
       }
@@ -633,6 +623,7 @@ export function App() {
 
   useEffect(() => {
     let mounted = true;
+    const initialRequest = requestRef.current;
 
     async function initialize() {
       if (!isExtensionRuntime()) {
@@ -643,17 +634,15 @@ export function App() {
         chrome.runtime.sendMessage({
           type: "GET_CURRENT_ROUTE_CONTEXT"
         } satisfies ExtensionMessage) as Promise<RouteContext | null>,
-        chrome.storage.local.get(UI_LANGUAGE_STORAGE_KEY)
+        chrome.storage.local.get(UI_LANGUAGE_STORAGE_KEY).catch(() => ({} as Record<string, unknown>))
       ]);
       if (!mounted) return;
       const savedLanguage = stored[UI_LANGUAGE_STORAGE_KEY];
-      languagePreferenceRef.current = isUiLanguage(savedLanguage);
-      setLanguage(
-        isUiLanguage(savedLanguage)
-          ? savedLanguage
-          : defaultUiLanguage(detected?.provider ?? "unknown")
-      );
-      await applyContext(detected);
+      if (!languagePreferenceRef.current && isUiLanguage(savedLanguage)) {
+        languagePreferenceRef.current = true;
+        setLanguage(savedLanguage);
+      }
+      if (requestRef.current === initialRequest) await applyContext(detected);
     }
 
     function onMessage(
@@ -679,21 +668,22 @@ export function App() {
           return;
         }
         const currentContext = contextRef.current;
-        if (
-          message.payload.payload &&
-          currentContext &&
-          message.payload.payload.contextSignature !==
-            signatureFromContext(currentContext)
-        ) {
+        if (!currentContext || !canAutoAnalyze(currentContext) ||
+            !matchesRouteContext(message.payload, currentContext)) {
           return;
         }
-        showBadgeView(message.payload, currentContext);
+        // Map updates can arrive while the popup is still reading a snapshot.
+        // Keep an idle notification without results from cancelling a retry.
+        if (message.payload.payload || message.payload.state !== "idle") {
+          requestRef.current += 1;
+          showBadgeView(message.payload, currentContext);
+        }
       }).catch(() => undefined);
     }
 
     if (isExtensionRuntime()) chrome.runtime.onMessage.addListener(onMessage);
     void initialize().catch((caught) => {
-      if (!mounted) return;
+      if (!mounted || requestRef.current !== initialRequest) return;
       setError(normalizeError(caught));
       setView("error");
     });
@@ -760,9 +750,11 @@ export function App() {
 
       {view === "empty" && (
         <section className="empty-state">
-          <p className="eyebrow">{copy.emptyEyebrow}</p>
-          <h1>{copy.emptyTitle}</h1>
-          <p>{copy.emptyBody}</p>
+          <p className="eyebrow">
+            {noVisibleRoutes ? localizedProviderName(provider, language) : copy.emptyEyebrow}
+          </p>
+          <h1>{noVisibleRoutes ? copy.noCardsTitle : copy.emptyTitle}</h1>
+          <p>{noVisibleRoutes ? copy.noCardsBody : copy.emptyBody}</p>
         </section>
       )}
 

@@ -131,6 +131,35 @@ describe("Open-Meteo weather normalization", () => {
     expect(geocodedNames.join(" ")).not.toMatch(/Louvre|Central Park/i);
   });
 
+  it("sends only known city and region names, even when labels look administrative", async () => {
+    const storage = installSessionStorage();
+    const fetchMock = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      return url.searchParams.has("name")
+        ? response({ results: [{ latitude: 42, longitude: -71 }] })
+        : response({ current: { weather_code: 0 } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const other = { text: "Known endpoint", latitude: 42.1, longitude: -71.1 };
+    const rejected = [
+      "City of Dreams", "Dream City, USA", "Private County, MA",
+      "Secret Road, Boston, ABC", "Campus, Boston, City of Dreams",
+      "星光美食市", "私人地名州， 中国"
+    ];
+    for (const text of rejected) {
+      await expect(getEndpointMidpointWeather({ text }, other)).resolves.toBeNull();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(storage.get).not.toHaveBeenCalled();
+
+    await getEndpointMidpointWeather({ text: "City of Dreams, boStoN, ma" }, other);
+    await getEndpointMidpointWeather({ text: "星光美食市，上海市" }, other);
+    await getEndpointMidpointWeather({ text: " sightseeing stop, cItY   oF LonDon " }, other);
+    const queries = fetchMock.mock.calls.map(([input]) => new URL(input).searchParams.get("name"));
+    expect(queries.filter(Boolean)).toEqual(["Boston, MA", "上海市", "City of London"]);
+    expect(Object.keys(storage.values).join(" ")).not.toMatch(/dreams|星光|sightseeing/i);
+  });
+
   it("never sends a full street address to geocoding", async () => {
     installSessionStorage();
     const fetchMock = vi.fn(async (input: string | URL | Request) => {

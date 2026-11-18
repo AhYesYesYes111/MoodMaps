@@ -436,6 +436,25 @@ describe("route-card badges", () => {
     );
   });
 
+  it("uses separate time and distance metrics when the map abbreviates either as m", () => {
+    const card = installRouteCardFixture();
+    card.setAttribute("data-trip-index", "0");
+    card.setAttribute("role", "link");
+    const duration = card.querySelector<HTMLElement>("#duration")!;
+    const distance = card.querySelector<HTMLElement>("#distance")!;
+    duration.before(distance);
+    distance.textContent = "800 m";
+    duration.textContent = "3 min";
+    const read = () => findRouteCards(document, "https://www.google.com/maps/dir/A/B");
+    expect(read()[0]).toMatchObject({durationMinutes: 3, distanceElement: distance});
+    duration.textContent = "7m";
+    distance.textContent = "3 km";
+    expect(read()[0]).toMatchObject({durationMinutes: 7, distanceElement: distance});
+    duration.remove();
+    distance.textContent = "800 m";
+    expect(read()).toHaveLength(0);
+  });
+
   it("reads and mounts inside Apple Maps route cards", () => {
     const card = installAppleRouteCardFixture();
     const pageUrl =
@@ -493,6 +512,31 @@ describe("route-card badges", () => {
       "wm-routes-item-desktop__details"
     )).toBe(true);
     expect(slot?.textContent).toContain("78");
+  });
+
+  it("reads the rendered metrics and selected route on the current Amap page", () => {
+    document.body.innerHTML =
+      '<div class="CarOrWalkRoutePlanItem_routePlanItem__test CarOrWalkRoutePlanItem_selected__test">' +
+      '<div data-duration="2449">41分钟<span hidden>2449</span></div>' +
+      '<div><span data-distance="24927">24.9公里<span hidden>24927</span></span></div>' +
+      '<div class="CarOrWalkRoutePlanItem_roadRow__test">途经：中关村东路</div>' +
+      '<div><div class="sidebar"></div></div></div>';
+    const card = document.body.firstElementChild as HTMLElement;
+    const duration = card.querySelector<HTMLElement>("[data-duration]")!;
+    Object.defineProperty(duration, "innerText", { value: "41分钟" });
+    duration.getBoundingClientRect = vi.fn(() => rect(125, 14, 60, 40));
+    card.getBoundingClientRect = vi.fn(() => rect(100, 93, 332));
+    const pageUrl = "https://amap.com/ssr/dir?type=0";
+    const cards = findRouteCards(document, pageUrl);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].durationMinutes).toBe(41);
+    expect(parseDistanceMeters(cards[0].distanceElement?.textContent ?? "")).toBe(24900);
+    const result = renderRouteBadges({
+      doc: document, pageUrl, payload: singleRoutePayload("途经：中关村东路", 41),
+      state: "idle", onAnalyze: vi.fn()
+    });
+    expect(result.selectedRouteId).toBe("route_0");
+    expect(card.querySelector(".moodmaps-route-badge-slot--amap")?.parentElement).toBe(card);
   });
 
   it("reads and mounts inside Amap route cards", () => {
@@ -736,6 +780,34 @@ describe("route-card badges", () => {
     ]);
   });
 
+  it("follows the active Google trip when its enclosing control changes role", () => {
+    installTwoRouteCardFixture();
+    const trips = [0, 1].map((index) => {
+      const card = document.getElementById("route-card-" + index)!;
+      card.removeAttribute("aria-selected");
+      const trip = document.createElement("div");
+      trip.dataset.tripIndex = String(index);
+      trip.setAttribute("role", index === 0 ? "link" : "button");
+      trip.getBoundingClientRect = card.getBoundingClientRect;
+      card.replaceWith(trip);
+      trip.append(card);
+      return trip;
+    });
+    const render = () => renderRouteBadges({
+      doc: document,
+      pageUrl: "https://www.google.com/maps/dir/A/B/",
+      payload: livePayload,
+      state: "idle",
+      onAnalyze: vi.fn()
+    });
+    expect(findRouteCards(document, "https://www.google.com/maps/dir/A/B/")
+      .map((card) => card.element)).toEqual(trips);
+    expect(render().selectedRouteId).toBe("route_0");
+    trips[0].setAttribute("role", "button");
+    trips[1].setAttribute("role", "link");
+    expect(render().selectedRouteId).toBe("route_1");
+  });
+
   it("opens a route-specific calculation dialog from the score badge", () => {
     installRouteCardFixture();
     renderRouteBadges({
@@ -778,6 +850,22 @@ describe("route-card badges", () => {
       ?.click();
     expect(document.querySelector(".moodmaps-score-explainer")).toBeNull();
     expect(score?.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("keeps the explanation open during internal scroll and closes on a second score click", () => {
+    const card = installRouteCardFixture();
+    renderRouteBadges({ doc: document, payload: livePayload, state: "idle", onAnalyze: vi.fn() });
+    const score = card.querySelector<HTMLElement>(".moodmaps-route-badge--score strong")!;
+    score.click();
+    const dialog = document.querySelector<HTMLElement>(".moodmaps-score-explainer")!;
+    dialog.dispatchEvent(new Event("scroll"));
+    expect(dialog.isConnected).toBe(true);
+    score.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    score.click();
+    expect(document.querySelector(".moodmaps-score-explainer")).toBeNull();
+    score.click();
+    document.dispatchEvent(new Event("scroll"));
+    expect(document.querySelector(".moodmaps-score-explainer")).toBeNull();
   });
 
   it("shows rebalanced weights that total 100% when inputs are unavailable", () => {

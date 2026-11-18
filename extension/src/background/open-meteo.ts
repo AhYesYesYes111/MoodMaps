@@ -44,180 +44,58 @@ function validCoordinates(
     : null;
 }
 
-function normalizedPlacePart(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
+// Only values from these tables may reach the geocoder or its cache key.
+function knownNames(names: string[]): Map<string, string> {
+  return new Map(names.map((name) => [name.toLowerCase(), name]));
 }
 
-function looksPrecise(value: string): boolean {
-  return (
-    /\d/.test(value) ||
-    /\b(?:airport|station|terminal|university|college|school|hospital|hotel|mall|plaza|building|tower|apartment|suite|unit|park|square|museum|gallery|stadium|arena|theater|theatre|cinema|restaurant|cafe|coffee|bar|pub|store|shop|market|center|centre|hall|church|temple|mosque|synagogue|zoo|aquarium|library|monument|beach|garden|club|office|house|home|work)\b/i.test(
-      value
-    ) ||
-    /\b(?:street|st|road|rd|avenue|ave|boulevard|blvd|lane|ln|drive|dr|highway|hwy|route|rte)\b\.?$/i.test(
-      value
-    ) ||
-    /(?:机场|機場|车站|車站|火车站|火車站|大学|大學|学校|學校|医院|醫院|酒店|商场|商場|大厦|大廈|公寓|公园|公園|广场|廣場|博物馆|博物館|体育场|體育場|剧院|劇院|影院|餐厅|餐廳|咖啡馆|咖啡館|市场|市場|超市|夜市|教堂|寺|清真寺|图书馆|圖書館|纪念碑|紀念碑|海滩|海灘|花园|花園|办公室|辦公室|街道|道路|路|街|巷|弄|号|號)$/.test(
-      value
-    )
-  );
-}
+const REGION_QUALIFIERS = knownNames([
+  "Australia", "Brazil", "Canada", "China", "France", "Germany", "India",
+  "Indonesia", "Italy", "Japan", "Mexico", "Netherlands", "New Zealand",
+  "Singapore", "South Africa", "South Korea", "Spain", "Switzerland", "Taiwan",
+  "Thailand", "United Arab Emirates", "United Kingdom", "United States", "Vietnam",
+  "中国", "中國", "日本", "韩国", "韓國", "新加坡", "法国", "法國", "德国", "德國",
+  "英国", "英國", "美国", "美國", "加拿大", "澳大利亚", "澳大利亞",
+  "US", "USA", "UK", "CN",
+  ...("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN " +
+    "MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY").split(" ")
+]);
 
-const COMMON_REGION_QUALIFIERS = new Set(
-  [
-    "australia",
-    "brazil",
-    "canada",
-    "china",
-    "france",
-    "germany",
-    "india",
-    "indonesia",
-    "italy",
-    "japan",
-    "mexico",
-    "netherlands",
-    "new zealand",
-    "singapore",
-    "south africa",
-    "south korea",
-    "spain",
-    "switzerland",
-    "taiwan",
-    "thailand",
-    "united arab emirates",
-    "united kingdom",
-    "united states",
-    "vietnam",
-    "中国",
-    "中國",
-    "日本",
-    "韩国",
-    "韓國",
-    "新加坡",
-    "法国",
-    "法國",
-    "德国",
-    "德國",
-    "英国",
-    "英國",
-    "美国",
-    "美國",
-    "加拿大",
-    "澳大利亚",
-    "澳大利亞"
-  ].map((value) => value.toLocaleLowerCase())
-);
+const CITY_NAMES = knownNames([
+  "Amsterdam", "Beijing", "Berlin", "Boston", "Cambridge", "Chicago", "Dubai",
+  "Hong Kong", "London", "Los Angeles", "Madrid", "Melbourne", "New Haven",
+  "New York", "Paris", "Rome", "San Francisco", "Seattle", "Seoul", "Shanghai",
+  "Singapore", "Sydney", "Taipei", "Tokyo", "Toronto", "Vancouver", "Washington",
+  "北京", "上海", "香港", "台北", "新加坡"
+]);
 
-// Text geocoding is deliberately allow-list based. Map labels are free-form and
-// a string that merely lacks an address keyword is not necessarily a city
-// (for example, "Tavern on the Green"). Unknown localities are skipped.
-const COMMON_CITY_NAMES = new Set(
-  [
-    "amsterdam",
-    "beijing",
-    "berlin",
-    "boston",
-    "cambridge",
-    "chicago",
-    "dubai",
-    "hong kong",
-    "london",
-    "los angeles",
-    "madrid",
-    "melbourne",
-    "new haven",
-    "new york",
-    "paris",
-    "rome",
-    "san francisco",
-    "seattle",
-    "seoul",
-    "shanghai",
-    "singapore",
-    "sydney",
-    "taipei",
-    "tokyo",
-    "toronto",
-    "vancouver",
-    "washington",
-    "北京",
-    "上海",
-    "香港",
-    "台北",
-    "新加坡"
-  ].map((value) => value.toLocaleLowerCase())
-);
-
-// 区 / 區 also ends the names of apartment compounds, campuses and individual
-// attractions. Only recognize known districts when that is the sole suffix.
-const KNOWN_DISTRICTS = new Set([
+// An unqualified label needs an explicit, known administrative name. POIs
+// also use words like "City of", "County", 市, 区, and 州 in their names.
+const ADMINISTRATIVE_NAMES = knownNames([
+  "City of London", "New York City", "City of Boston", "Los Angeles County",
+  "北京市", "上海市", "天津市", "重庆市", "重慶市", "广州市", "廣州市",
+  "深圳市", "杭州市", "南京市", "台北市", "臺北市",
+  "香港特别行政区", "香港特別行政區", "澳门特别行政区", "澳門特別行政區",
+  "内蒙古自治区", "內蒙古自治區", "广西壮族自治区", "廣西壯族自治區",
+  "西藏自治区", "西藏自治區", "宁夏回族自治区", "寧夏回族自治區",
+  "新疆维吾尔自治区", "新疆維吾爾自治區",
   "浦东新区", "浦東新區", "黄浦区", "黃浦區", "徐汇区", "徐匯區",
   "静安区", "靜安區", "朝阳区", "朝陽區", "海淀区", "海淀區"
 ]);
 
-function explicitlyAdministrative(value: string): boolean {
-  return (
-    /^(?:city|county|state|province|region|prefecture|municipality)\s+of\b/i.test(
-      value
-    ) ||
-    /\b(?:city|county|province|region|prefecture|municipality)$/.test(
-      value.toLocaleLowerCase()
-    ) ||
-    KNOWN_DISTRICTS.has(value) ||
-    /(?:市|省|州|县|縣|自治区|自治區|特别行政区|特別行政區)$/.test(
-      value
-    )
-  );
-}
-
-function clearlyCoarseLocality(value: string): boolean {
-  return (
-    !looksPrecise(value) &&
-    (explicitlyAdministrative(value) ||
-      COMMON_CITY_NAMES.has(value.toLocaleLowerCase()))
-  );
-}
-
-function looksLikeRegionQualifier(value: string): boolean {
-  return (
-    (!looksPrecise(value) && explicitlyAdministrative(value)) ||
-    /^[A-Z]{2,3}$/.test(value) ||
-    COMMON_REGION_QUALIFIERS.has(value.toLocaleLowerCase())
-  );
-}
-
-/**
- * Returns only text that is clearly city/region-level. A single free-form place,
- * POI, or street address is deliberately rejected instead of being geocoded.
- */
 export function coarseLocationText(value: string): string | null {
-  const parts = value
-    .split(/[,，]/)
-    .map(normalizedPlacePart)
+  const parts = value.split(/[,，]/)
+    .map((part) => part.trim().replace(/\s+/g, " ").toLowerCase())
     .filter(Boolean);
-  if (parts.length === 0) return null;
-  if (parts.length === 1) {
-    const only = parts[0];
-    return !looksPrecise(only) && explicitlyAdministrative(only) ? only : null;
-  }
+  const last = parts.at(-1) ?? "";
+  const administrative = ADMINISTRATIVE_NAMES.get(last);
+  if (parts.length < 2) return administrative ?? null;
 
-  if (parts.length === 2) {
-    const [first, second] = parts;
-    if (looksLikeRegionQualifier(second) && clearlyCoarseLocality(first)) {
-      return first + ", " + second;
-    }
-    return clearlyCoarseLocality(second) ? second : null;
-  }
-
-  const regionParts = parts.slice(-2);
-  if (
-    looksLikeRegionQualifier(regionParts[1]) &&
-    clearlyCoarseLocality(regionParts[0])
-  ) {
-    return regionParts.join(", ");
-  }
-  return clearlyCoarseLocality(regionParts[1]) ? regionParts[1] : null;
+  const previous = parts[parts.length - 2];
+  const locality = ADMINISTRATIVE_NAMES.get(previous) ?? CITY_NAMES.get(previous);
+  const region = administrative ?? REGION_QUALIFIERS.get(last);
+  if (locality && region) return locality + ", " + region;
+  return administrative ?? CITY_NAMES.get(last) ?? null;
 }
 
 function endpointReference(location: LocationInput): EndpointReference | null {

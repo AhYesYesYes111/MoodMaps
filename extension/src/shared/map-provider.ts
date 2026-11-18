@@ -5,6 +5,7 @@ export function detectMapProvider(pageUrl: string): MapProvider {
     const hostname = new URL(pageUrl).hostname.toLocaleLowerCase();
     if (
       hostname === "maps.apple.com" ||
+      hostname === "maps.apple.com.cn" ||
       hostname === "beta.maps.apple.com"
     ) {
       return "apple";

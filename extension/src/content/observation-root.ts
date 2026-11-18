@@ -1,5 +1,5 @@
 export const ROUTE_OBSERVATION_ROOT_SELECTOR =
-  ".mw-route-planning, .wm-routes, #dir_container, .dir-panel";
+  '.mw-route-planning, .wm-routes, #dir_container, .dir-panel, [class*="DirectionIndexContent_directionIndexPage__"]';
 
 export function isRouteObservationRoot(element: Element): boolean {
   return element.matches(ROUTE_OBSERVATION_ROOT_SELECTOR);
